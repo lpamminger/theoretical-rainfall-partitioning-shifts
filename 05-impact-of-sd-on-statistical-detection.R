@@ -71,13 +71,13 @@ p_value_generator_residuals <- function(parameter_position_index, streamflow_mul
   ### Pre-rainfall #############################################################
   pre_rainfall <- modified_stochastic_rainfall_generator(parameter_vector = rainfall_parameters, 
                                                          length_of_generated_rainfall = pre_shift_length_years,
-                                                         random = TRUE)
+                                                         set_seed = FALSE)
   
   
   ### Change-rainfall ##########################################################
   change_rainfall <- modified_stochastic_rainfall_generator(parameter_vector = rainfall_parameters, 
                                                             length_of_generated_rainfall = post_shift_length_years,
-                                                            random = TRUE)
+                                                            set_seed = FALSE)
   
   
   ### Apply synthetic_streamflow model #########################################
@@ -96,7 +96,7 @@ p_value_generator_residuals <- function(parameter_position_index, streamflow_mul
   change_synthetic_streamflow_model <- synthetic_streamflow_model(
                                         control_parameters = streamflow_parameters, 
                                         control_rainfall = pre_rainfall,
-                                        random = TRUE
+                                        set_seed = FALSE
                                         )
                                       
   
@@ -105,9 +105,8 @@ p_value_generator_residuals <- function(parameter_position_index, streamflow_mul
                       change_rainfall = change_rainfall
                       )
   
-  pre_streamflow <- all_streamflow[, 3]
-  mean_only_pre_streamflow <- all_streamflow[, 2]
-  change_streamflow <- all_streamflow[, 6]
+  pre_streamflow <- all_streamflow[, 2]
+  change_streamflow <- all_streamflow[, 4]
   
   
   
@@ -118,9 +117,11 @@ p_value_generator_residuals <- function(parameter_position_index, streamflow_mul
   
   
   #### Find linear relationship between control rainfall and runoff ############
-  linear_model_control <- lm(mean_only_pre_streamflow ~ pre_rainfall) # line
+  linear_model_control <- lm(pre_streamflow ~ pre_rainfall) # line
   
-  pre_residuals <- pre_streamflow -  mean_only_pre_streamflow # pre-dot to pre-line distance
+  fitted_values <- linear_model_control[["fitted.values"]]
+  
+  pre_residuals <- pre_streamflow -  fitted_values # pre-dot to pre-line distance
   
   pre_linear_model_coefficients <- c("intercept" = coef(linear_model_control)[1], 
                                      "slope" = coef(linear_model_control)[2])
@@ -128,7 +129,7 @@ p_value_generator_residuals <- function(parameter_position_index, streamflow_mul
   #### Apply pre_linear_model_coefficients to change_rainfall ##################
   #### to predict future streamflow 
   predicted_streamflow <- pre_linear_model_coefficients[1] + 
-                            (pre_linear_model_coefficients[2] * change_rainfall)
+    (pre_linear_model_coefficients[2] * change_rainfall)
   
   
   #### Find residual between change_streamflow and predicted_streamflow ########
@@ -191,11 +192,10 @@ repeat_p_value_generator_wrapper <- function(replicate, detection_function){
   
 }
 
-## Set up parallel processing using future_map =================================
-plan(multisession, workers = availableCores())
 
 
 ## Run replicates in parallel ==================================================
+plan(multisession, workers = availableCores())
 ks_p_values_replicates <- future_map(.x = replicates, 
                                      .f = repeat_p_value_generator_wrapper,
                                      detection_function = "ks.test",
@@ -204,6 +204,7 @@ ks_p_values_replicates <- future_map(.x = replicates,
                                        globals = TRUE),
                                      .progress = TRUE)
 
+plan(multisession, workers = availableCores())
 fligner_p_values_replicates <- future_map(.x = replicates, 
                                           .f = repeat_p_value_generator_wrapper,
                                           detection_function = "fligner.test",
@@ -344,7 +345,7 @@ single_low_high_sd_plot <- summary_all_tests |>
 
 # Save graphs ------------------------------------------------------------------
 
-ggsave(paste0("./Graphs/how_low_high_sd_impacts_auto_detection", str_remove_all(Sys.Date(), "-"), ".pdf"),
+ggsave(paste0("./Graphs/how_low_high_sd_impacts_auto_detection", get_date(), ".pdf"),
        plot = combined_low_high_sd_plot,
        device = cairo_pdf,
        units = "mm",
@@ -352,7 +353,7 @@ ggsave(paste0("./Graphs/how_low_high_sd_impacts_auto_detection", str_remove_all(
        height = 110)
 
 
-ggsave(paste0("./Graphs/single_how_low_high_sd_impacts_auto_detection", str_remove_all(Sys.Date(), "-"), ".pdf"),
+ggsave(paste0("./Graphs/single_how_low_high_sd_impacts_auto_detection", get_date(), ".pdf"),
        plot = single_low_high_sd_plot,
        device = cairo_pdf,
        units = "mm",

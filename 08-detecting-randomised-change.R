@@ -9,152 +9,10 @@ pacman::p_load(sn, moments, tidyverse, furrr, tictoc)
 # Import functions -------------------------------------------------------------
 source("./Functions/adjusting_parameters.R")
 source("./Functions/utility.R")
+source("./Functions/synthetic_streamflow_model.R") 
+source("./Functions/modified_stochastic_rainfall_generator.R")
+source("./Functions/utility.R")
 
-
-
-# Altered modified stochastic rainfall generate - remove the set.seed ----------
-modified_stochastic_rainfall_generator <- function(parameter_vector, length_of_generated_rainfall) {
-  # ============================================================================
-  # Obtain statistical properties of observed rainfall
-  # browser() # for debugging
-
-  ## Get mean (x_bar) and std (s) of obs. annual rainfall
-  x_bar <- parameter_vector[1]
-  s <- parameter_vector[2]
-
-  ## Get lag-1 autocorrelation coefficent (r) from obs. rainfall
-  r <- parameter_vector[3]
-
-  ## Get the skewness (gamma) from obs. rainfall
-  gamma <- parameter_vector[4]
-
-  ## Get coefficient of skewness (gamma_e)
-  gamma_e <- ((1 - r^3) / ((1 - r^2)^(3 / 2))) * gamma
-
-  # ============================================================================
-
-
-  # ============================================================================
-  # Generating rainfall
-
-  eta <- rnorm(length_of_generated_rainfall, mean = 0, sd = 1)
-
-  ## Generate random number using eta_t and gamma_e (epsilon)
-  epsilon <- (2 / gamma_e) * (((1 + ((gamma_e * eta) / 6) - (gamma_e^2 / 36))^3) - 1)
-
-  ## Generate standardised annual rainfall (X)
-  X <- numeric(length_of_generated_rainfall)
-  X_prev <- 0 # assume X_prev = zero
-
-  for (t in 1:length_of_generated_rainfall) {
-    X[t] <- (r * X_prev) + (sqrt(1 - (r^2)) * epsilon[t])
-    X_prev <- X[t]
-  }
-
-
-  ## Annual rainfall amount (generated_rainfall)
-  generated_rainfall <- x_bar + (s * X)
-  # ============================================================================
-
-  return(generated_rainfall)
-}
-
-
-
-
-
-# Altered synthetic streamflow model - remove set.seed -------------------------
-synthetic_streamflow_model <- function(control_parameters, control_rainfall) {
-  
-  force(control_parameters)
-  force(control_rainfall)
-  
-  # get control_parameters
-  control_intercept <- control_parameters[1]
-  control_slope <- control_parameters[2]
-  control_autocorr <- control_parameters[3]
-  control_stand_dev <- control_parameters[4]
-  control_skew <- control_parameters[5]
-  
-  # control decay value
-  decay_value <- control_intercept + (control_slope * mean(control_rainfall))
-  
-  # set previous value
-  control_boxcox_streamflow_previous <- decay_value
-  
-  control_boxcox_streamflow <- numeric(length = length(control_rainfall))
-  
-  # Do I care about the mean-boxcox streamflow? not including it may change some things
-  
-  # get standard deviation and skewness to the skewed normal parameters
-  control_skewed_normal_parameters <- to_skewed_normal_parameters(
-    user_mean = 0,
-    user_std = control_stand_dev,
-    user_skewness = control_skew)
-  
-  # Run the model
-  for (time_step in seq_along(control_rainfall)) {
-    
-    control_boxcox_streamflow[time_step] <- control_intercept + 
-      (control_slope * control_rainfall[time_step]) + 
-      (control_autocorr * (control_boxcox_streamflow_previous - decay_value)) +
-      rsn(n = 1, xi = control_skewed_normal_parameters[1], omega = control_skewed_normal_parameters[2], alpha = control_skewed_normal_parameters[3])
-    
-    control_boxcox_streamflow_previous <- control_boxcox_streamflow[time_step]
-    
-  }
-  
-  
-  
-  function(change_parameters, change_rainfall) {
-    
-    #browser() # for debugging
-    
-    force(change_parameters)
-    force(change_rainfall)
-    
-    
-    # get change_parameters
-    change_intercept <- change_parameters[1]
-    change_slope <- change_parameters[2]
-    change_autocorr <- change_parameters[3]
-    change_stand_dev <- change_parameters[4]
-    change_skew <- change_parameters[5]
-    
-    # change decay value
-    decay_value <- change_intercept + (change_slope * mean(change_rainfall))
-    
-    # set previous value
-    change_boxcox_streamflow_previous <- decay_value
-    
-    change_boxcox_streamflow <- numeric(length = length(change_rainfall))
-    
-    # Do I care about the mean-boxcox streamflow? not including it may change some things
-    
-    # get standard deviation and skewness to the skewed normal parameters
-    change_skewed_normal_parameters <- to_skewed_normal_parameters(user_mean = 0,
-                                                                   user_std = change_stand_dev,
-                                                                   user_skewness = change_skew)
-    
-    # Run the model
-    for (time_step in seq_along(change_rainfall)) {
-      
-      change_boxcox_streamflow[time_step] <- change_intercept + 
-        (change_slope * change_rainfall[time_step]) + 
-        (change_autocorr * (change_boxcox_streamflow_previous - decay_value)) +
-        rsn(n = 1, xi = change_skewed_normal_parameters[1], omega = change_skewed_normal_parameters[2], alpha = change_skewed_normal_parameters[3])
-      
-      change_boxcox_streamflow_previous <- change_boxcox_streamflow[time_step]
-      
-    }
-    
-    
-    # I want the function to return the mean and actual boxcox streamflow (as a tibble) |control_mean|control_actual|change_mean|change_actual
-    result <- cbind(control_rainfall, control_boxcox_streamflow, change_rainfall, change_boxcox_streamflow)
-    return(result)
-    
-  }
-}
 
 
 
@@ -226,13 +84,15 @@ generate_rainfall_runoff <- function(intercept_or_slope, replicate, intercept_mu
   ### At the moment both control and change rainfall have the same parameters
   control_rainfall <- modified_stochastic_rainfall_generator(
                         parameter_vector = control_rainfall_parameters, 
-                        length_of_generated_rainfall = pre_shift_length
+                        length_of_generated_rainfall = pre_shift_length,
+                        set_seed = FALSE
                         )
   
 
   change_rainfall <- modified_stochastic_rainfall_generator(
                        parameter_vector = change_rainfall_parameters,
-                       length_of_generated_rainfall = post_shift_length
+                       length_of_generated_rainfall = post_shift_length,
+                       set_seed = FALSE
                        )
   
   
@@ -240,7 +100,8 @@ generate_rainfall_runoff <- function(intercept_or_slope, replicate, intercept_mu
   ### Control streamflow #######################################################
   streamflow_setup <- synthetic_streamflow_model(
                         control_parameters = control_streamflow_parameters,
-                        control_rainfall = control_rainfall
+                        control_rainfall = control_rainfall,
+                        set_seed = FALSE
                         )
   
   
@@ -365,18 +226,17 @@ change_multipliers_replicate_intercept_slope_combinations <- function(multiplier
 
 
 
-# ENTER PARAMETERS HERE !
 
 
 ## Number of replicates is dictated by the length of intercept_or_slope
 REPLICATES <- 5000
+
 intercept_slope_or_no_change <- sample(c(1, 2, 3), size = REPLICATES, replace = TRUE) # not testing 4
 
 multipliers <- seq(from = 1.01, to = 2, by = 0.01)
 
+
 plan(multisession, workers = availableCores())
-
-
 identification_results_100_year <- future_map(
   .x = multipliers,
   .f = change_multipliers_replicate_intercept_slope_combinations,
@@ -396,7 +256,6 @@ identification_results_100_year <- future_map(
 
 
 plan(multisession, workers = availableCores())
-
 identification_results_20_year <- future_map(
   .x = multipliers,
   .f = change_multipliers_replicate_intercept_slope_combinations,

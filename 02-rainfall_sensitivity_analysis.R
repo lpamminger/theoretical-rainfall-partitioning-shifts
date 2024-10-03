@@ -25,11 +25,12 @@ time_series_length <- user_time_series_length + skip # we remove the first two v
 
 
 ## Control parameters are based on sample rainfall =============================
-control_parameters <- c("mean" = 1006, 
-                        "sd" = 221, 
-                        "auto" = 0.015, 
-                        "skew" = 0.19
-                        )
+control_parameters <- c(
+  "mean" = 1006,
+  "sd" = 221,
+  "auto" = 0.015,
+  "skew" = 0.19
+)
 
 
 
@@ -43,19 +44,20 @@ change_parameters <- imap(.x = multipliers_for_control_parameters,
 
 parameter_list <- c(list(control_parameters), change_parameters)
 
-names(parameter_list) <- c("control",
-                           "mean",
-                           "standard_deviation",
-                           "autocorrelation",
-                           "skewness"
-                           )
+names(parameter_list) <- c(
+  "control",
+  "mean",
+  "standard_deviation",
+  "autocorrelation",
+  "skewness"
+)
 
 
 ## Put the parameters through the stochastic rainfall generator ============
 rainfall_list <- map(.x = parameter_list,
                      .f = modified_stochastic_rainfall_generator,
                      length_of_generated_rainfall = time_series_length,
-                     random = FALSE
+                     set_seed = TRUE
                      )
 
 
@@ -70,7 +72,7 @@ streamflow_parameters <- c(-4.1, 0.017, 0.16, 2, 0.014)
 change_synthetic_streamflow_model <- synthetic_streamflow_model(
                                        control_parameters = streamflow_parameters, 
                                        control_rainfall = rainfall_list$control,
-                                       random = FALSE
+                                       set_seed = TRUE
                                        )
 
 

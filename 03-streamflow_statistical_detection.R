@@ -15,6 +15,7 @@ source("./Functions/box_cox_transforms.R")
 source("./Functions/adjusting_parameters.R")
 source("./Functions/modified_stochastic_rainfall_generator.R")
 source("./Functions/synthetic_streamflow_model.R")
+source("./Functions/utility.R")
 
 
 # Generate observations --------------------------------------------------------
@@ -62,13 +63,15 @@ p_value_generator <- function(parameter_position_index, streamflow_multiplier, p
   
   ### Pre-rainfall #############################################################
   pre_rainfall <- modified_stochastic_rainfall_generator(parameter_vector = rainfall_parameters, 
-                                                         length_of_generated_rainfall = pre_shift_length_years
+                                                         length_of_generated_rainfall = pre_shift_length_years,
+                                                         set_seed = FALSE
                                                          )
   
   
   ### Change-rainfall ##########################################################
   change_rainfall <- modified_stochastic_rainfall_generator(parameter_vector = rainfall_parameters, 
-                                                            length_of_generated_rainfall = post_shift_length_years
+                                                            length_of_generated_rainfall = post_shift_length_years,
+                                                            set_seed = FALSE
                                                             )
   
   
@@ -85,7 +88,7 @@ p_value_generator <- function(parameter_position_index, streamflow_multiplier, p
   change_synthetic_streamflow_model <- synthetic_streamflow_model(
                                          control_parameters = streamflow_parameters, 
                                          control_rainfall = pre_rainfall,
-                                         random = NULL
+                                         set_seed = FALSE
                                          )
   
   
@@ -94,9 +97,9 @@ p_value_generator <- function(parameter_position_index, streamflow_multiplier, p
                       change_rainfall = change_rainfall
                       )
   
-  pre_streamflow <- all_streamflow[, 2]
+  pre_streamflow <- all_streamflow[, 2] # gets control_boxcox_streamflow from matrix
   
-  change_streamflow <- all_streamflow[, 4]
+  change_streamflow <- all_streamflow[, 4] # gets change_boxcox_streamflow from matrix
   
   
   
@@ -120,38 +123,6 @@ p_value_generator <- function(parameter_position_index, streamflow_multiplier, p
     stop("Function name not found")
   }
 }
-
-
-# For paper special case for autocorrelation and standard dev ------------------
-# What I want to do:
-# - apply trend test to autocorrelation term
-# - change the standard deviation
-# - see how changing the standard deviation impact the likelihood of detection of autocorrelation
-# sd is fixed default
-
-## Objective is to see how changing autocorrelation impacts sd
-wrapper_special_case <- function(post_rainfall_variation_years, multiplier, detection_function) {
-  
-  p_value_generator(parameter_position_index = 3, # 3 = autocorrelation
-                    streamflow_multiplier = multiplier, # WRONG we want to change sd
-                    post_rainfall_variation_years = post_rainfall_variation_years,
-                    detection_function = detection_function
-                    )
-}
-
-
-pre_allocate_replicate <- matrix(numeric(length = 91 * 100), nrow = 91, ncol = 100)
-
-for (i in 1:100) {
-  single_replicate <- map_dbl(.x = seq(from = 10, to = post_shift_length_years),
-                              .f = wrapper_special_case,
-                              multiplier = 2,
-                              detection_function = "ks.test"
-                              )
-  
-  pre_allocate_replicate[,i] <- single_replicate
-}  
-
 
 
 
@@ -190,11 +161,10 @@ repeat_p_value_generator_wrapper <- function(replicate, detection_function){
   
 }
 
-## Set up parallel processing using future_map =================================
-plan(multisession, workers = availableCores())
 
 
 ## Run replicates in parallel ==================================================
+plan(multisession, workers = availableCores())
 ks_p_values_replicates <- future_map(.x = replicates,
                                      .f = repeat_p_value_generator_wrapper,
                                      detection_function = "ks.test",
@@ -203,9 +173,8 @@ ks_p_values_replicates <- future_map(.x = replicates,
                                        globals = TRUE),
                                      .progress = TRUE)
 
+
 plan(multisession, workers = availableCores())
-
-
 fligner_p_values_replicates <- future_map(.x = replicates,
                                           .f = repeat_p_value_generator_wrapper,
                                           detection_function = "fligner.test",
@@ -310,7 +279,7 @@ combined_residual_detection_plot <- summary_all_tests |>
   ) +
   theme(legend.position = "bottom")
 
-ggsave(paste0("./Graphs/combined_streamflow_detection_", str_remove_all(Sys.Date(), "-"), ".pdf"),
+ggsave(paste0("./Graphs/combined_streamflow_detection_", get_date(), ".pdf"),
   plot = combined_residual_detection_plot,
   device = cairo_pdf,
   units = "mm",
