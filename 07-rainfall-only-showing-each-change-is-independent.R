@@ -15,7 +15,7 @@ pacman::p_load(sn, moments, tidyverse, furrr, parallel)
 
 
 # Import functions -------------------------------------------------------------
-source("./Functions/adjusting_parameter.R")
+source("./Functions/adjusting_parameters.R")
 
 
 

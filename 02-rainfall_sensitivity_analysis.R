@@ -7,7 +7,7 @@ par(mfrow = c(1,1))
 
 
 # Import libraries--------------------------------------------------------------
-pacman::p_load(sn, moments, tidyverse, ggpubr)
+pacman::p_load(sn, moments, tidyverse)
 
 
 # Import functions -------------------------------------------------------------
