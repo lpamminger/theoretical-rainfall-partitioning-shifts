@@ -1,0 +1,466 @@
+# detecting randomised change
+
+# Clear environment and console ------------------------------------------------
+cat("\014")
+
+# Import libraries--------------------------------------------------------------
+pacman::p_load(sn, moments, tidyverse, furrr, tictoc)
+
+# Import functions -------------------------------------------------------------
+source("./Functions/adjusting_parameters.R")
+source("./Functions/utility.R")
+
+
+
+# Altered modified stochastic rainfall generate - remove the set.seed ----------
+modified_stochastic_rainfall_generator <- function(parameter_vector, length_of_generated_rainfall) {
+  # ============================================================================
+  # Obtain statistical properties of observed rainfall
+  # browser() # for debugging
+
+  ## Get mean (x_bar) and std (s) of obs. annual rainfall
+  x_bar <- parameter_vector[1]
+  s <- parameter_vector[2]
+
+  ## Get lag-1 autocorrelation coefficent (r) from obs. rainfall
+  r <- parameter_vector[3]
+
+  ## Get the skewness (gamma) from obs. rainfall
+  gamma <- parameter_vector[4]
+
+  ## Get coefficient of skewness (gamma_e)
+  gamma_e <- ((1 - r^3) / ((1 - r^2)^(3 / 2))) * gamma
+
+  # ============================================================================
+
+
+  # ============================================================================
+  # Generating rainfall
+
+  eta <- rnorm(length_of_generated_rainfall, mean = 0, sd = 1)
+
+  ## Generate random number using eta_t and gamma_e (epsilon)
+  epsilon <- (2 / gamma_e) * (((1 + ((gamma_e * eta) / 6) - (gamma_e^2 / 36))^3) - 1)
+
+  ## Generate standardised annual rainfall (X)
+  X <- numeric(length_of_generated_rainfall)
+  X_prev <- 0 # assume X_prev = zero
+
+  for (t in 1:length_of_generated_rainfall) {
+    X[t] <- (r * X_prev) + (sqrt(1 - (r^2)) * epsilon[t])
+    X_prev <- X[t]
+  }
+
+
+  ## Annual rainfall amount (generated_rainfall)
+  generated_rainfall <- x_bar + (s * X)
+  # ============================================================================
+
+  return(generated_rainfall)
+}
+
+
+
+
+
+# Altered synthetic streamflow model - remove set.seed -------------------------
+synthetic_streamflow_model <- function(control_parameters, control_rainfall) {
+  
+  force(control_parameters)
+  force(control_rainfall)
+  
+  # get control_parameters
+  control_intercept <- control_parameters[1]
+  control_slope <- control_parameters[2]
+  control_autocorr <- control_parameters[3]
+  control_stand_dev <- control_parameters[4]
+  control_skew <- control_parameters[5]
+  
+  # control decay value
+  decay_value <- control_intercept + (control_slope * mean(control_rainfall))
+  
+  # set previous value
+  control_boxcox_streamflow_previous <- decay_value
+  
+  control_boxcox_streamflow <- numeric(length = length(control_rainfall))
+  
+  # Do I care about the mean-boxcox streamflow? not including it may change some things
+  
+  # get standard deviation and skewness to the skewed normal parameters
+  control_skewed_normal_parameters <- to_skewed_normal_parameters(
+    user_mean = 0,
+    user_std = control_stand_dev,
+    user_skewness = control_skew)
+  
+  # Run the model
+  for (time_step in seq_along(control_rainfall)) {
+    
+    control_boxcox_streamflow[time_step] <- control_intercept + 
+      (control_slope * control_rainfall[time_step]) + 
+      (control_autocorr * (control_boxcox_streamflow_previous - decay_value)) +
+      rsn(n = 1, xi = control_skewed_normal_parameters[1], omega = control_skewed_normal_parameters[2], alpha = control_skewed_normal_parameters[3])
+    
+    control_boxcox_streamflow_previous <- control_boxcox_streamflow[time_step]
+    
+  }
+  
+  
+  
+  function(change_parameters, change_rainfall) {
+    
+    #browser() # for debugging
+    
+    force(change_parameters)
+    force(change_rainfall)
+    
+    
+    # get change_parameters
+    change_intercept <- change_parameters[1]
+    change_slope <- change_parameters[2]
+    change_autocorr <- change_parameters[3]
+    change_stand_dev <- change_parameters[4]
+    change_skew <- change_parameters[5]
+    
+    # change decay value
+    decay_value <- change_intercept + (change_slope * mean(change_rainfall))
+    
+    # set previous value
+    change_boxcox_streamflow_previous <- decay_value
+    
+    change_boxcox_streamflow <- numeric(length = length(change_rainfall))
+    
+    # Do I care about the mean-boxcox streamflow? not including it may change some things
+    
+    # get standard deviation and skewness to the skewed normal parameters
+    change_skewed_normal_parameters <- to_skewed_normal_parameters(user_mean = 0,
+                                                                   user_std = change_stand_dev,
+                                                                   user_skewness = change_skew)
+    
+    # Run the model
+    for (time_step in seq_along(change_rainfall)) {
+      
+      change_boxcox_streamflow[time_step] <- change_intercept + 
+        (change_slope * change_rainfall[time_step]) + 
+        (change_autocorr * (change_boxcox_streamflow_previous - decay_value)) +
+        rsn(n = 1, xi = change_skewed_normal_parameters[1], omega = change_skewed_normal_parameters[2], alpha = change_skewed_normal_parameters[3])
+      
+      change_boxcox_streamflow_previous <- change_boxcox_streamflow[time_step]
+      
+    }
+    
+    
+    # I want the function to return the mean and actual boxcox streamflow (as a tibble) |control_mean|control_actual|change_mean|change_actual
+    result <- cbind(control_rainfall, control_boxcox_streamflow, change_rainfall, change_boxcox_streamflow)
+    return(result)
+    
+  }
+}
+
+
+
+pivot_streamflow_setup <- function(model_results) {
+  ## get into |Output = bc_streamflow|Input = rainfall|Condition = control or change|
+  ## so it has to be 3 cols and 200 rows
+
+  model_results |> 
+    rename(
+      control_boxcoxstreamflow = control_boxcox_streamflow,
+      change_boxcoxstreamflow = change_boxcox_streamflow
+    ) |> 
+    pivot_longer(
+      cols = !replicate,
+      names_to = c("control_or_change", ".value"),
+      names_sep = "_" # there are two underscores
+    ) |> 
+    arrange(control_or_change)
+}
+
+
+
+generate_rainfall_runoff <- function(intercept_or_slope, replicate, intercept_multiplier, slope_multiplier, auto_rainfall_multiplier, pre_shift_length, post_shift_length, control_streamflow_parameters = NULL, control_rainfall_parameters = NULL) {
+  
+  # intercept_or_slope is a value of 1, 2, 3 or 4 
+  
+  ## Default change streamflow_parameters ======================================
+  if (is.null(control_rainfall_parameters)) {
+    control_rainfall_parameters <- c("mean" = 1006, 
+                                     "sd" = 221, 
+                                     "auto" = 0.015, 
+                                     "skew" = 0.19
+                                     )
+  }
+  
+  ## Default control streamflow_parameters =====================================
+  if (is.null(control_streamflow_parameters)) {
+    control_streamflow_parameters <- c("a0" = -4.1, 
+                                       "a1" = 0.017, 
+                                       "a2" = 0.16, 
+                                       "a3" = 2, 
+                                       "a4" = 0.014
+                                       )
+  }
+  
+  
+  ## Make change_streamflow_parameters =========================================
+  change_streamflow_parameters <- change_parameter_set_function(
+                                    multiplier = case_when(
+                                      intercept_or_slope == 1 ~ intercept_multiplier,
+                                      intercept_or_slope == 2 ~ slope_multiplier,
+                                      .default = 1 # account for 3 here 
+                                      ), 
+                                    parameter_to_change = intercept_or_slope, # 3rd index is used here but it doesn't matter because the multipier = 1
+                                    control_parameter_set = control_streamflow_parameters
+                                    )
+  
+  change_rainfall_parameters <- change_parameter_set_function(
+                                  multiplier = if_else(
+                                    intercept_or_slope == 4,
+                                    auto_rainfall_multiplier,
+                                    1
+                                  ),
+                                  parameter_to_change = intercept_or_slope,
+                                  control_parameter_set = control_rainfall_parameters
+                                )
+  
+  ## Make rainfall =============================================================
+  ### At the moment both control and change rainfall have the same parameters
+  control_rainfall <- modified_stochastic_rainfall_generator(
+                        parameter_vector = control_rainfall_parameters, 
+                        length_of_generated_rainfall = pre_shift_length
+                        )
+  
+
+  change_rainfall <- modified_stochastic_rainfall_generator(
+                       parameter_vector = change_rainfall_parameters,
+                       length_of_generated_rainfall = post_shift_length
+                       )
+  
+  
+  ## Make streamflow ===========================================================
+  ### Control streamflow #######################################################
+  streamflow_setup <- synthetic_streamflow_model(
+                        control_parameters = control_streamflow_parameters,
+                        control_rainfall = control_rainfall
+                        )
+  
+  
+  ## Change streamflow ===========================================================
+  model_results <- streamflow_setup(
+                     change_parameters = change_streamflow_parameters,
+                     change_rainfall = change_rainfall
+                     ) 
+  
+  model_results <- model_results |> 
+                     as_tibble() |> 
+                     add_column(
+                       replicate, 
+                       .before = 1
+                       )
+  
+  pivot_streamflow_setup(model_results)
+}
+
+
+# Running replicates -----------------------------------------------------------
+## Run the replicate_intercept_slope_combinations for multiple intercept and slope multipliers
+
+
+# Find the probablity of intercept or slope change for each replicate ----------
+get_probability_of_intercept_change <- function(boxcox_streamflow, rainfall, control_or_change) {
+  
+  p_values <- lm(boxcox_streamflow ~ rainfall + control_or_change + (rainfall * control_or_change)) |> # or just intercept lm(boxcox_streamflow ~ rainfall + control_or_change) |> 
+    summary() |> 
+    coef()
+  
+  p_values[(nrow(p_values) - 1), ncol(p_values)] # or just intercept p_values[nrow(p_values), ncol(p_values)]
+  
+}
+
+
+get_probability_of_slope_change <- function(boxcox_streamflow, rainfall, control_or_change) {
+  
+  p_values <- lm(boxcox_streamflow ~ rainfall + control_or_change + (rainfall * control_or_change)) |> 
+    summary() |> 
+    coef()
+  
+  p_values[nrow(p_values), ncol(p_values)]
+
+}
+  
+
+change_multipliers_replicate_intercept_slope_combinations <- function(multiplier, intercept_slope_or_no_change, pre_shift_length, post_shift_length) {
+  
+  
+  
+  replicate_intercept_slope_combinations <- imap(
+                                              .x = intercept_slope_or_no_change,
+                                              .f = generate_rainfall_runoff,
+                                              intercept_multiplier = multiplier, # keep same for plots
+                                              slope_multiplier = multiplier, 
+                                              auto_rainfall_multiplier = multiplier,
+                                              pre_shift_length = pre_shift_length, 
+                                              post_shift_length = post_shift_length
+                                            ) |> 
+                                            list_rbind()
+  
+  
+  p_value_intercept_slope <- replicate_intercept_slope_combinations |> 
+                               summarise(
+                                 p_value_intercept_change = get_probability_of_intercept_change(
+                                   boxcox_streamflow = boxcoxstreamflow,
+                                   rainfall = rainfall,
+                                   control_or_change = control_or_change
+                                 ),
+                                 p_value_slope_change = get_probability_of_slope_change(
+                                   boxcox_streamflow = boxcoxstreamflow,
+                                   rainfall = rainfall,
+                                   control_or_change = control_or_change
+                                 ),
+                                 .by = replicate
+                               )
+  
+  
+  result <- p_value_intercept_slope |> 
+              add_column(
+                known_change = intercept_slope_or_no_change,
+                .before = 1
+              ) |> 
+              mutate(
+                known_change = case_when(
+                  known_change == 1 ~ "intercept",
+                  known_change == 2 ~ "slope",
+                  known_change == 3 ~ "no_change",
+                  known_change == 4 ~ "auto_rainfall"
+                ),
+                predicted_change = case_when(
+                  (p_value_intercept_change < 0.05) & (p_value_slope_change < 0.05) ~ "both",
+                  p_value_intercept_change < 0.05 ~ "intercept",
+                  p_value_slope_change < 0.05 ~ "slope",
+                  .default = "no_change"
+                )
+              )
+  
+    
+  
+  result |> 
+    mutate(
+      correct_identification = known_change == predicted_change
+    ) |> 
+    summarise(
+      sum_known_change = n(),
+      sum_correct_identification = sum(correct_identification),
+      .by = known_change
+    ) |> 
+    mutate(
+      percentage_correct = (sum_correct_identification / sum_known_change) * 100
+    ) |>  
+    select(known_change, percentage_correct) |> 
+    add_column(
+      multiplier = multiplier,
+      .before = 1
+    )
+ 
+  
+} 
+
+
+
+# ENTER PARAMETERS HERE !
+
+
+## Number of replicates is dictated by the length of intercept_or_slope
+REPLICATES <- 5000
+intercept_slope_or_no_change <- sample(c(1, 2, 3), size = REPLICATES, replace = TRUE) # not testing 4
+
+multipliers <- seq(from = 1.01, to = 2, by = 0.01)
+
+plan(multisession, workers = availableCores())
+
+
+identification_results_100_year <- future_map(
+  .x = multipliers,
+  .f = change_multipliers_replicate_intercept_slope_combinations,
+  intercept_slope_or_no_change = intercept_slope_or_no_change,
+  pre_shift_length = 100,
+  post_shift_length = 100,
+  .options = furrr_options(
+    globals = TRUE,
+    seed = TRUE
+  ),
+  .progress = TRUE
+  ) |> 
+  list_rbind() |> 
+  add_column(
+    shift_length = 100
+  )
+
+
+plan(multisession, workers = availableCores())
+
+identification_results_20_year <- future_map(
+  .x = multipliers,
+  .f = change_multipliers_replicate_intercept_slope_combinations,
+  intercept_slope_or_no_change = intercept_slope_or_no_change,
+  pre_shift_length = 20,
+  post_shift_length = 20,
+  .options = furrr_options(
+    globals = TRUE,
+    seed = TRUE
+  ),
+  .progress = TRUE
+  ) |> 
+  list_rbind() |> 
+  add_column(
+    shift_length = 20
+  )
+
+identification_results <- rbind(identification_results_100_year, identification_results_20_year)
+
+
+
+# Plot results -----------------------------------------------------------------
+plot <- identification_results |> 
+  filter(known_change != "auto_rainfall") |> # This doesn't do anything
+  mutate(
+    multiplier = (multiplier - 1) * 100,
+    known_change = case_when(
+      known_change == "intercept" ~ "Intercept",
+      known_change == "slope" ~ "Slope",
+      known_change == "no_change" ~ "No Change",
+      known_change == "auto_rainfall" ~ "Rainfall Autocorrelation",
+      .default = NA
+    )
+  ) |>
+  ggplot(aes(
+    x = multiplier,
+    y = percentage_correct,
+    colour = known_change,
+    linetype = as.factor(shift_length)
+  )) +
+  geom_line(linewidth = 1) +
+  labs(
+    x = "Change in Parameter (%)",
+    y = "Correct Change Identified (%)",
+    colour = "Type of change",
+    linetype = "Shift length (Years)"
+  ) +
+  scale_colour_brewer(palette = "Set1") +
+  theme_bw() +
+  theme(
+    legend.position = "bottom",
+    axis.title = element_text(size = 11),
+    legend.text = element_text(size = 10)
+  )
+
+
+ggsave(
+  filename = paste0("correct_idenfitication_changes_", get_date(), ".pdf"),
+  plot = plot,
+  device = "pdf",
+  path = "./Graphs",
+  width = 210,
+  height = 150,
+  units = "mm"
+)
+
+
