@@ -39,7 +39,8 @@ generated_rainfall <- modified_stochastic_rainfall_generator(
                           "auto" = 0.015, 
                           "skew" = 0.19), 
                         length_of_generated_rainfall = time_series_length,
-                        random = FALSE)
+                        set_seed = TRUE
+                        )
 
 
 # Generate box-cox streamflow using synthetic model ----------------------------
@@ -57,17 +58,21 @@ multipliers_for_control_parameters <- c(1.5, 1.3, 3, 2, 65)
 
 change_parameters <- imap(.x = multipliers_for_control_parameters, 
                           .f = change_parameter_set_function, 
-                          control_parameter_set = control_parameters)
+                          control_parameter_set = control_parameters
+                          )
 
 
 ## Combine control and change parameter sets in a single list ==================
 parameter_list <- c(list(control_parameters), change_parameters)
-names(parameter_list) <- c("control",
-                           "intercept",
-                           "slope",
-                           "autocorrelation",
-                           "standard_deviation",
-                           "skewness")
+
+names(parameter_list) <- c(
+  "control",
+  "intercept",
+  "slope",
+  "autocorrelation",
+  "standard_deviation",
+  "skewness"
+)
 
 
 
@@ -78,7 +83,7 @@ names(parameter_list) <- c("control",
 change_synthetic_streamflow_model <- synthetic_streamflow_model(
                                        control_parameters = parameter_list$control,
                                        control_rainfall = generated_rainfall,
-                                       random = FALSE
+                                       set_seed = TRUE
                                        )
 
 ### Part 2 of function factory - add the change values

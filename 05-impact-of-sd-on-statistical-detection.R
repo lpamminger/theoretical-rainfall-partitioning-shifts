@@ -28,18 +28,9 @@ streamflow_parameter_multipliers <- c(1.1, 1.25, 1.5)
 rainfall_parameters <- c("mean" = 1006,
                          "sd" = 221,
                          "auto" = 0.015,
-                         "skew" = 0.19)
+                         "skew" = 0.19
+                         )
 
-
-
-
-# Rough idea for residual bit:
-## - get the rainfall-runoff slope and intercept for the control set
-##   Put control rainfall (x) and control streamflow into lm_eq
-## - Use the eq values to predict change streamflow
-## - Then ks.test the residuals so it will be: 
-##    control_streamflow - predicted_control_streamflow and 
-##    change_streamflow - predicted_change_streamflow (using control y = mx + c)
 
 
 

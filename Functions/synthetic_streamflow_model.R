@@ -1,16 +1,14 @@
-synthetic_streamflow_model <- function(control_parameters, control_rainfall, random) {
+synthetic_streamflow_model <- function(control_parameters, control_rainfall, set_seed) {
   
   force(control_parameters)
   force(control_rainfall)
-  force(random)
+  force(set_seed)
   
   
-  # set a constant seed if random is FALSE or generate random seed if true
-  if (random == FALSE) {
+  # set a constant seed if set_seed is true
+  if (set_seed == TRUE) {
     set.seed(8675309) 
-  } else if (random == TRUE) {
-    set.seed(NULL)
-  }
+  } 
   
   
   # get control_parameters
@@ -59,12 +57,9 @@ synthetic_streamflow_model <- function(control_parameters, control_rainfall, ran
     
     
     # Reset the seed
-    if (random == FALSE) {
+    if (set_seed == TRUE) {
       set.seed(8675309) 
-    } else if (random == TRUE) {
-      set.seed(NULL)
-    }
-    
+    } 
     
     # get change_parameters
     change_intercept <- change_parameters[1]
