@@ -35,7 +35,7 @@ pivot_streamflow_setup <- function(model_results) {
 
 
 
-generate_rainfall_runoff <- function(intercept_or_slope, replicate, intercept_multiplier, slope_multiplier, auto_rainfall_multiplier, pre_shift_length, post_shift_length, control_streamflow_parameters = NULL, control_rainfall_parameters = NULL) {
+generate_rainfall_runoff <- function(intercept_or_slope, replicate, intercept_multiplier, slope_multiplier, pre_shift_length, post_shift_length, control_streamflow_parameters = NULL, control_rainfall_parameters = NULL) {
   
   # intercept_or_slope is a value of 1, 2, 3 or 4 
   
@@ -70,15 +70,6 @@ generate_rainfall_runoff <- function(intercept_or_slope, replicate, intercept_mu
                                     control_parameter_set = control_streamflow_parameters
                                     )
   
-  change_rainfall_parameters <- change_parameter_set_function(
-                                  multiplier = if_else(
-                                    intercept_or_slope == 4,
-                                    auto_rainfall_multiplier,
-                                    1
-                                  ),
-                                  parameter_to_change = intercept_or_slope,
-                                  control_parameter_set = control_rainfall_parameters
-                                )
   
   ## Make rainfall =============================================================
   ### At the moment both control and change rainfall have the same parameters
@@ -89,6 +80,8 @@ generate_rainfall_runoff <- function(intercept_or_slope, replicate, intercept_mu
                         )
   
 
+  change_rainfall_parameters <- control_rainfall_parameters # in future we might want to change rainfall
+  
   change_rainfall <- modified_stochastic_rainfall_generator(
                        parameter_vector = change_rainfall_parameters,
                        length_of_generated_rainfall = post_shift_length,
@@ -98,7 +91,7 @@ generate_rainfall_runoff <- function(intercept_or_slope, replicate, intercept_mu
   
   ## Make streamflow ===========================================================
   ### Control streamflow #######################################################
-  streamflow_setup <- synthetic_streamflow_model(
+  streamflow_setup <- synthetic_streamflow_model( # function factory
                         control_parameters = control_streamflow_parameters,
                         control_rainfall = control_rainfall,
                         set_seed = FALSE
@@ -138,6 +131,7 @@ get_probability_of_intercept_change <- function(boxcox_streamflow, rainfall, con
 }
 
 
+
 get_probability_of_slope_change <- function(boxcox_streamflow, rainfall, control_or_change) {
   
   p_values <- lm(boxcox_streamflow ~ rainfall + control_or_change + (rainfall * control_or_change)) |> 
@@ -154,31 +148,30 @@ change_multipliers_replicate_intercept_slope_combinations <- function(multiplier
   
   
   replicate_intercept_slope_combinations <- imap(
-                                              .x = intercept_slope_or_no_change,
-                                              .f = generate_rainfall_runoff,
-                                              intercept_multiplier = multiplier, # keep same for plots
-                                              slope_multiplier = multiplier, 
-                                              auto_rainfall_multiplier = multiplier,
-                                              pre_shift_length = pre_shift_length, 
-                                              post_shift_length = post_shift_length
-                                            ) |> 
-                                            list_rbind()
+    .x = intercept_slope_or_no_change,
+    .f = generate_rainfall_runoff,
+    intercept_multiplier = multiplier, # keep same for plots
+    slope_multiplier = multiplier, 
+    pre_shift_length = pre_shift_length, 
+    post_shift_length = post_shift_length
+    ) |> 
+    list_rbind()
   
   
   p_value_intercept_slope <- replicate_intercept_slope_combinations |> 
-                               summarise(
-                                 p_value_intercept_change = get_probability_of_intercept_change(
-                                   boxcox_streamflow = boxcoxstreamflow,
-                                   rainfall = rainfall,
-                                   control_or_change = control_or_change
-                                 ),
-                                 p_value_slope_change = get_probability_of_slope_change(
-                                   boxcox_streamflow = boxcoxstreamflow,
-                                   rainfall = rainfall,
-                                   control_or_change = control_or_change
-                                 ),
-                                 .by = replicate
-                               )
+    summarise(
+      p_value_intercept_change = get_probability_of_intercept_change(
+        boxcox_streamflow = boxcoxstreamflow,
+        rainfall = rainfall,
+        control_or_change = control_or_change
+      ),
+      p_value_slope_change = get_probability_of_slope_change(
+        boxcox_streamflow = boxcoxstreamflow,
+        rainfall = rainfall,
+        control_or_change = control_or_change
+        ),
+      .by = replicate
+      )
   
   
   result <- p_value_intercept_slope |> 
@@ -229,7 +222,11 @@ change_multipliers_replicate_intercept_slope_combinations <- function(multiplier
 
 
 ## Number of replicates is dictated by the length of intercept_or_slope
-REPLICATES <- 5000
+## Increasing the pre-shift length alters the p-value the asymptote. 
+## Have pre-shift and post-shift equal for comparison...
+
+
+REPLICATES <- 100
 
 intercept_slope_or_no_change <- sample(c(1, 2, 3), size = REPLICATES, replace = TRUE) # not testing 4
 
@@ -255,12 +252,13 @@ identification_results_100_year <- future_map(
   )
 
 
+
 plan(multisession, workers = availableCores())
 identification_results_20_year <- future_map(
   .x = multipliers,
   .f = change_multipliers_replicate_intercept_slope_combinations,
   intercept_slope_or_no_change = intercept_slope_or_no_change,
-  pre_shift_length = 100, 
+  pre_shift_length = 20, 
   post_shift_length = 20,
   .options = furrr_options(
     globals = TRUE,
@@ -279,14 +277,12 @@ identification_results <- rbind(identification_results_100_year, identification_
 
 # Plot results -----------------------------------------------------------------
 plot <- identification_results |> 
-  filter(known_change != "auto_rainfall") |> # This doesn't do anything
   mutate(
     multiplier = (multiplier - 1) * 100,
     known_change = case_when(
       known_change == "intercept" ~ "Intercept",
       known_change == "slope" ~ "Slope",
       known_change == "no_change" ~ "No Change",
-      known_change == "auto_rainfall" ~ "Rainfall Autocorrelation",
       .default = NA
     )
   ) |>
