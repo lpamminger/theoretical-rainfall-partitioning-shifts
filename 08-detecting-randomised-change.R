@@ -226,7 +226,7 @@ change_multipliers_replicate_intercept_slope_combinations <- function(multiplier
 ## Have pre-shift and post-shift equal for comparison...
 
 
-REPLICATES <- 100
+REPLICATES <- 5000
 
 intercept_slope_or_no_change <- sample(c(1, 2, 3), size = REPLICATES, replace = TRUE) # not testing 4
 
