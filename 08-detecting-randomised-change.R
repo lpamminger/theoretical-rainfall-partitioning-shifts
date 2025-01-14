@@ -260,7 +260,7 @@ identification_results_20_year <- future_map(
   .x = multipliers,
   .f = change_multipliers_replicate_intercept_slope_combinations,
   intercept_slope_or_no_change = intercept_slope_or_no_change,
-  pre_shift_length = 20,
+  pre_shift_length = 100, 
   post_shift_length = 20,
   .options = furrr_options(
     globals = TRUE,
@@ -301,7 +301,7 @@ plot <- identification_results |>
     x = "Change in Parameter (%)",
     y = "Correct Change Identified (%)",
     colour = "Type of change",
-    linetype = "Shift length (Years)"
+    linetype = "Post Shift Years"
   ) +
   scale_colour_brewer(palette = "Set1") +
   theme_bw() +
@@ -311,7 +311,7 @@ plot <- identification_results |>
     legend.text = element_text(size = 10)
   )
 
-
+plot
 ggsave(
   filename = paste0("correct_idenfitication_changes_", get_date(), ".pdf"),
   plot = plot,
