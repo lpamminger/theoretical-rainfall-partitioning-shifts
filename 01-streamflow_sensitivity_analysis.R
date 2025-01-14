@@ -249,9 +249,11 @@ tidy_boxcox_streamflow <- tidy_boxcox_streamflow |>
   )
 
 ## Main plot - rainfall-runoff histograms ======================================
+# I want 21 control and 24 change
+
 main_plot <- tidy_boxcox_streamflow |>
-  ggplot(aes(x = rainfall, y = boxcox_streamflow, colour = control_or_change, fill = control_or_change)) +
-  geom_point(shape = 21, alpha = 0.7) +
+  ggplot(aes(x = rainfall, y = boxcox_streamflow, colour = control_or_change, fill = control_or_change, shape = control_or_change)) +
+  geom_point(alpha = 0.7) +
   geom_smooth(formula = y ~ x, method = lm, se = FALSE, linewidth = 0.25) +
   labs(
     x = "Total Annual Precipitation (mm)",
@@ -262,8 +264,13 @@ main_plot <- tidy_boxcox_streamflow |>
   theme_bw() +
   facet_wrap(
     ~parameter,
-    nrow = 3, ncol = 2, axis.labels = "margins"
+    nrow = 3, 
+    ncol = 2, 
+    scales = "fixed",
+    axes = "all", # remove
+    axis.labels = "all" # replace with axis.labels = "margins"
   ) +
+  scale_shape_manual(values = c(21, 24)) +
   theme(
     legend.title = element_blank(),
     strip.text = element_blank(),
@@ -399,8 +406,8 @@ lag_1_streamflow_graph <- tidy_boxcox_streamflow |>
     .by = control_or_change
   ) |>
   tail(-2) |> # remove first two values of tibble because of lag
-  ggplot(aes(x = boxcox_streamflow, y = lag_boxcox_streamflow, colour = control_or_change, fill = control_or_change)) +
-  geom_point(shape = 21, alpha = 0.7) +
+  ggplot(aes(x = boxcox_streamflow, y = lag_boxcox_streamflow, colour = control_or_change, fill = control_or_change, shape = control_or_change)) +
+  geom_point(alpha = 0.7) +
   geom_smooth(formula = y ~ x, method = lm, se = FALSE, linewidth = 0.25) +
   labs(
     x = "Total Annual Streamflow (Box-Cox Transformed)",
@@ -408,6 +415,7 @@ lag_1_streamflow_graph <- tidy_boxcox_streamflow |>
   ) +
   scale_color_brewer(palette = "Set1") +
   scale_fill_manual(values = c("#f5a6a7", "#d4e5f2")) +
+  scale_shape_manual(values = c(21, 24)) +
   theme_bw() +
   theme(
     legend.title = element_blank(),
@@ -418,7 +426,6 @@ lag_1_streamflow_graph <- tidy_boxcox_streamflow |>
     axis.title = element_text(size = 10)
   ) +
   guides(colour = guide_legend(override.aes = list(size = 2, linewidth = 0.5)))
-
 
 
 

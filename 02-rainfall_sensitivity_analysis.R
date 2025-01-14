@@ -199,8 +199,8 @@ tidy_boxcox_streamflow <- tidy_boxcox_streamflow |>
 
 ## Main plot - rainfall-runoff histograms ======================================
 main_plot <- tidy_boxcox_streamflow |>
-  ggplot(aes(x = rainfall, y = boxcox_streamflow, colour = control_or_change, fill = control_or_change)) +
-  geom_point(shape = 21, alpha = 0.7) +
+  ggplot(aes(x = rainfall, y = boxcox_streamflow, colour = control_or_change, fill = control_or_change, shape = control_or_change)) +
+  geom_point(alpha = 0.7) +
   geom_smooth(formula = y ~ x, method = lm, se = FALSE, linewidth = 0.25) +
   labs(
     x = "Total Annual Precipitation (mm)",
@@ -208,6 +208,7 @@ main_plot <- tidy_boxcox_streamflow |>
   ) +
   scale_color_brewer(palette = "Set1") +
   scale_fill_manual(values = c("#f5a6a7", "#d4e5f2")) +
+  scale_shape_manual(values = c(21, 24)) +
   theme_bw() +
   facet_wrap(
     ~parameter,
