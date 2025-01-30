@@ -5,6 +5,89 @@ rm(list = ls())
 cat("\014")
 
 
+
+
+## PUT CLIMATE ANALYSIS HERE ##
+# method:
+# 1. load kgc package
+# 2. Get the gauge_information tibble into |siteid|lon|lat
+# 3. Round lat and lon using RoundCoordinates (use specified names)
+# 4. Use LookupCZ to turn lat+lon into climate type
+# 5. Save result
+# 6. Repeat analysis below by climate type
+
+
+## TEMP CODE transferred from testing ## - REMOVE
+
+library(kgc)
+library(tidyverse)
+
+round_any = function(x, accuracy, f = round){
+  f(x / accuracy) * accuracy
+}
+
+gauge_information <- read_csv(
+  "PHD/Papers/RQ1/theoretical-rainfall-partitioning-shifts/Data/Tidy/gauge_information_CAMELS_20240807.csv",
+  show_col_types = FALSE
+) |> 
+  select(gauge, state, lat, lon)
+
+climate_zones <- climatezones |> 
+  as_tibble() |> 
+  rename(
+    lat = Lat,
+    lon = Lon
+  )
+
+
+
+data <- data.frame(Site = c("GC","UFS","NEG"),
+                   Longitude = c(-15.42,10.98,34.78),
+                   Latitude = c(27.82,47.42,30.86))
+data <- data.frame(data,
+                   rndCoord.lon = RoundCoordinates(data$Longitude),
+                   rndCoord.lat = RoundCoordinates(data$Latitude))
+data <- data.frame(data,ClimateZ=LookupCZ(data))
+
+
+
+
+
+# use the function?
+# data must be |site_ID|lon|lat|
+adjusted_gauge_information <- gauge_information |> 
+  select(!state) |> 
+  relocate(
+    lon,
+    .after = 1
+  ) |> 
+  mutate(
+    rndCoord.lon = RoundCoordinates(lon),
+    rndCoord.lat = RoundCoordinates(lat)
+  ) #|> 
+#as.data.frame()
+
+
+
+
+x <- cbind(
+  adjusted_gauge_information, 
+  LookupCZ(data = adjusted_gauge_information)
+) |> 
+  as_tibble() |> 
+  rename(
+    climate_type = `LookupCZ(data = adjusted_gauge_information)`
+  ) |> 
+  mutate(
+    major_climate_type = str_sub(climate_type, start = 1L, end = 1L)
+  )
+
+
+
+
+
+
+
 # Import libraries -------------------------------------------------------------
 pacman::p_load(tidyverse, sn, moments)
 
