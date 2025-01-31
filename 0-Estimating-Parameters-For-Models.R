@@ -1,5 +1,11 @@
 # Estimating parameters
 
+# TODO:
+# 1. Fix up n = count for the boxplots
+# 2. Try scatter plot method
+
+
+
 # Clear environment and console ------------------------------------------------
 rm(list = ls())
 cat("\014")
@@ -8,7 +14,7 @@ cat("\014")
 # Import libraries -------------------------------------------------------------
 pacman::p_load(tidyverse, sn, moments)
 
-# kgc loads depedencies that conflict with tidyverse call kgc:: instead
+# kgc loads dependencies that conflict with tidyverse call kgc:: instead
 
 # Import data ------------------------------------------------------------------
 data <- read_csv(
@@ -26,7 +32,7 @@ gauge_information <- read_csv(
 
 
 
-# Assign climate type to each gauge using `kgc` --------------------------------
+# 1. Assign climate type to each gauge -----------------------------------------
 ## `LookupCZ` function provides the climate zone based on lon and lat 
 ## Relies on the climatezone dataframe
 climatezones <- kgc::climatezones
@@ -73,8 +79,8 @@ climate_type_gauge_info <- cbind(
 
 
 
-
-# Rainfall mean, sd, auto and skewness -----------------------------------------
+# 2. Rainfall statistics -------------------------------------------------------
+# (mean, sd, auto and skewness) 
 get_lag_1_autocorrelation <- function(timeseries) {
   acf(timeseries, na.action = na.pass, plot = FALSE)$acf[2]
 }
@@ -93,7 +99,7 @@ rainfall_stats_per_gauge <- data |>
   )
 
 
-## Overall rainfall statistics =================================================
+
 summary_rainfall_stat <- rainfall_stats_per_gauge |>
   pivot_longer(
     cols = starts_with("p"),
@@ -101,26 +107,7 @@ summary_rainfall_stat <- rainfall_stats_per_gauge |>
     values_to = "values"
   ) 
 
-overall_summary_rainfall_stat <- summary_rainfall_stat |>
-  summarise(
-    q50 = median(values),
-    q5 = quantile(values, 0.05),
-    q95 = quantile(values, 0.95),
-    .by = metric
-  )
-
-
-## By climate type rainfall statistics =========================================
-climate_type_summary_rainfall_stat <- summary_rainfall_stat |> 
-  summarise(
-    q50 = median(values),
-    q5 = quantile(values, 0.05),
-    q95 = quantile(values, 0.95),
-    .by = c(metric, major_climate_type)
-  )
-
-
-## Boxplot of rainfall statistics ==============================================
+## Tidy summary stats ready for plotting =======================================
 ### To add a overall to boxplot copy the entire tibble replace major climate 
 ### type with overall and rbind() (not very elegant)
 plot_summary_rainfall_stat <- summary_rainfall_stat |> 
@@ -148,32 +135,73 @@ plot_summary_rainfall_stat <- summary_rainfall_stat |>
       )
   )
 
+### Rainfall multipliers #######################################################
+rainfall_multiplier <- tribble(
+  ~metric,              ~multiplier,
+  "Mean",                0.8,
+  "Standard Deviation",  1.3,
+  "Autocorrelation",     5,
+  "Skewness",            5
+)
+
+
+
+### Overall rainfall stats #####################################################
+overall_rainfall_stats <- plot_summary_rainfall_stat |> 
+  summarise(
+    median = median(values),
+    P5 = quantile(values, 0.05),
+    P95 = quantile(values, 0.95),
+    .by = c(metric, major_climate_type)
+  ) |> 
+  left_join(
+    rainfall_multiplier,
+    by = join_by(metric)
+  ) |> 
+  mutate(
+    adjusted_parameter = median * multiplier
+  ) |> 
+  # Order facets
+  mutate(
+    metric = factor(
+      metric, 
+      levels = c("Mean", "Standard Deviation", "Autocorrelation", "Skewness")
+    )
+  )
+
 
 
 ### Code to produce n = ...
 ###  Not great it needs the have mulitiple y_positions for each facet
 ### Another alternative is to have it only for the first facet?
 ### FIX LATER
-count_summary_rainfall_data <- plot_summary_rainfall_stat |> 
-  summarise(
-    y_position = 0,
-    n = n(),
-    .by = major_climate_type
-  ) |> 
-  mutate(
-    label_n = paste0("n = ", n)
-  )
+#count_summary_rainfall_data <- plot_summary_rainfall_stat |> 
+#  summarise(
+#    y_position = 0,
+#    n = n(),
+#    .by = major_climate_type
+#  ) |> 
+#  mutate(
+#    label_n = paste0("n = ", n)
+#  )
 
 
-### Plot #######################################################################
-plot_summary_rainfall_stat |> 
+## Boxplot of rainfall statistics ==============================================
+rainfall_boxplot <- plot_summary_rainfall_stat |> 
   ggplot(aes(x = major_climate_type, y = values, fill = major_climate_type)) +
   geom_boxplot(show.legend = FALSE) +
-  geom_text(
-    aes(x = major_climate_type, y = y_position, label = label_n),
-    data = count_summary_rainfall_data,
-    inherit.aes = FALSE
-    ) +
+  geom_hline(
+    aes(yintercept = adjusted_parameter), 
+    data = overall_rainfall_stats |> filter(major_climate_type == "Overall"),
+    linetype = "dashed",
+    colour = "#ff7f00",
+    linewidth = 1
+  ) +
+  #geom_text(
+  #  aes(x = major_climate_type, y = y_position, label = label_n),
+  #  data = count_summary_rainfall_data,
+  #  inherit.aes = FALSE
+  #  ) +
   labs(
     x = "Major Climate Type",
     y = "Value"
@@ -184,7 +212,22 @@ plot_summary_rainfall_stat |>
   theme()
 
 
-# Calculate average fitted slope and intercept ---------------------------------
+### Save graph #################################################################
+ggsave(
+  filename = "rainfall_boxplot.pdf",
+  plot = rainfall_boxplot,
+  device = "pdf",
+  path = "./Graphs",
+  width = 297,
+  height = 210,
+  units = "mm"
+)
+
+
+
+# 3. Rainfall-partitioning statistics ------------------------------------------
+
+## Calculate fitted slope and intercept per gauge ==============================
 get_fitted_intercept <- function(rainfall, streamflow) {
   coef(lm(streamflow ~ rainfall))[1]
 }
@@ -201,7 +244,6 @@ line_of_best_fit_per_catchment <- data |>
   ) 
 
 
-## Overall intercept and slope statistics ======================================
 summary_intercept_and_slope <- line_of_best_fit_per_catchment |>
   pivot_longer(
     cols = starts_with("fitted"),
@@ -209,19 +251,9 @@ summary_intercept_and_slope <- line_of_best_fit_per_catchment |>
     values_to = "values"
   ) 
 
-overall_summary_intercept_and_slope <- summary_intercept_and_slope |>
-  summarise(
-    q50 = median(values),
-    q5 = quantile(values, 0.05),
-    q95 = quantile(values, 0.95),
-    .by = metric
-  )
 
 
-## By climate type intercept and slope statistics ==============================
-### ADD HERE
-
-# Calculate average autocorrelation --------------------------------------------
+## Calculate boxcox streamflow autocorrelation per gauge =======================
 summary_autocorrelation <- data |> 
   summarise(
     auto = get_lag_1_autocorrelation(bc_q),
@@ -235,20 +267,8 @@ summary_autocorrelation <- data |>
   )
 
 
-## Overall autocorrelation statistics ==========================================
-overall_summary_autocorrelation <- summary_autocorrelation |> 
-  summarise(
-    q50 = median(values),
-    q5 = quantile(values, 0.05),
-    q95 = quantile(values, 0.95),
-    .by = metric
-  ) 
 
-
-## By climate type autocorrelation statistics ==================================
-
-
-# Calculate average sd and skewness of residuals around line of best fit -------
+## Calculate sd and skewness of residuals around line of best fit per gauge ====
 get_sd_around_line_of_best_fit <- function(rainfall, streamflow) {
   sd(lm(streamflow ~ rainfall)$residuals)
 }
@@ -265,8 +285,6 @@ spread_and_shape_around_line_of_best_fit <- data |>
   )
 
 
-## Overall spread and shape statistics =========================================
-
 summary_spread_and_shape <- spread_and_shape_around_line_of_best_fit |>
   pivot_longer(
     cols = ends_with("residuals"),
@@ -274,19 +292,9 @@ summary_spread_and_shape <- spread_and_shape_around_line_of_best_fit |>
     values_to = "values"
   ) 
 
-overall_summary_spread_and_shape <- summary_spread_and_shape |> 
-  summarise(
-    q50 = median(values),
-    q5 = quantile(values, 0.05),
-    q95 = quantile(values, 0.95),
-    .by = metric
-  )
 
+## Bring intercept, slope, auto, sd and skew results together ==================
 
-## By climate type spread and shape statistics =================================
-
-# Combine streamflow model parameters into a single table ----------------------
-## Overall =====================================================================
 summary_streamflow_model <- rbind(
   summary_intercept_and_slope,
   summary_autocorrelation,
@@ -294,7 +302,7 @@ summary_streamflow_model <- rbind(
 )
 
 
-## By climate type =============================================================
+### Include climate type #######################################################
 ### combine everything for plotting similar table to the rainfall one
 summary_partitioning_stat <- rbind(
   summary_intercept_and_slope,
@@ -334,10 +342,52 @@ plot_summary_partitioning_stat <- summary_partitioning_stat |>
   )
 
 
-### Plot #######################################################################
-plot_summary_partitioning_stat |> 
+### Multipliers to boxplots ####################################################
+partitioning_multiplier <- tribble(
+  ~metric,              ~multiplier,
+  "Intercept",           1.5,
+  "Slope",               1.3,
+  "Autocorrelation",     3,
+  "Standard Deviation",  2,
+  "Skewness",            65
+)
+
+
+### Overall rainfall-partitioning statistics ################################### 
+overall_partitioning_stats <- plot_summary_partitioning_stat |> 
+  summarise(
+    median = median(values),
+    P5 = quantile(values, 0.05),
+    P95 = quantile(values, 0.95),
+    .by = c(metric, major_climate_type)
+  ) |> 
+  left_join(
+    partitioning_multiplier,
+    by = join_by(metric)
+  ) |> 
+  mutate(
+    adjusted_parameter = median * multiplier
+  ) |> 
+  # Order facets
+  mutate(
+    metric = factor(
+      metric, 
+      levels = c("Intercept", "Slope", "Autocorrelation", "Standard Deviation", "Skewness")
+    )
+  )
+
+
+## Boxplot of rainfall-partitioning statistics =================================
+partitioning_boxplot <- plot_summary_partitioning_stat |> 
   ggplot(aes(x = major_climate_type, y = values, fill = major_climate_type)) +
   geom_boxplot(show.legend = FALSE) +
+  geom_hline(
+    aes(yintercept = adjusted_parameter), 
+    data = overall_partitioning_stats |> filter(major_climate_type == "Overall"),
+    linetype = "dashed",
+    colour = "#ff7f00",
+    linewidth = 1
+    ) +
   labs(
     x = "Major Climate Type",
     y = "Value"
@@ -347,3 +397,14 @@ plot_summary_partitioning_stat |>
   theme_bw() +
   theme()
 
+
+### Save plot ##################################################################
+ggsave(
+  filename = "partitioning_boxplot.pdf",
+  plot = partitioning_boxplot,
+  device = "pdf",
+  path = "./Graphs",
+  width = 297,
+  height = 210,
+  units = "mm"
+)
