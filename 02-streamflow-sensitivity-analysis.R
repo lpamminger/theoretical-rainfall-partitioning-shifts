@@ -17,7 +17,7 @@ pacman::p_load(sn, moments, tidyverse)
 
 
 # Import functions -------------------------------------------------------------
-source("./Functions/box_cox_transforms.R")
+source("./Functions/REMOVE_box_cox_transforms.R") # update this
 source("./Functions/synthetic_streamflow_model.R") 
 source("./Functions/adjusting_parameters.R")
 source("./Functions/modified_stochastic_rainfall_generator.R")
@@ -392,7 +392,6 @@ abc_labels <- data.frame(label = paste0(letters[1:length(control_parameters)],")
 
 
 rainfall_runoff_plot <- main_plot + inset_histograms + abc_labels
-
 
 
 
