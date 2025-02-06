@@ -320,7 +320,7 @@ partioning_control_and_multipliers <- summary_partitioning |>
 
 partitioning_temperate_parameters <- partioning_control_and_multipliers |> 
   filter(major_climate_type == "Temperate (C)") |> 
-  filter(metric != "fitted_intercept") |> 
+  filter(metric != "Intercept") |> 
   select(metric, major_climate_type, median, q75, q99, q75_multi, q99_multi) |> 
   rename(
     control_parameter = median,
@@ -333,7 +333,7 @@ partitioning_temperate_parameters <- partioning_control_and_multipliers |>
 ### Mannually fix the mean rainfall so its a decrease
 just_intercept <- partioning_control_and_multipliers |> 
   filter(major_climate_type == "Temperate (C)") |> 
-  filter(metric == "fitted_intercept") |> 
+  filter(metric == "Intercept") |> 
   select(!c(q75, q99, q75_multi, q99_multi)) |> 
   rename(
     control_parameter = median,
