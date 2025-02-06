@@ -1,8 +1,6 @@
 # Estimating parameters
 
 # TODO:
-# 1. Median of temperate climate type
-# 2. Multiplier for temperate climate type. Start with 25th percentile then move to 95th.
 # 3. Fix up n = count for the boxplots
 # 4. Try scatter plot method
 
@@ -115,7 +113,7 @@ rainfall_temperate_parameters <- rainfall_control_and_multipliers |>
     small_change_parameter = q75,
     large_change_parameter = q99,
     small_multiplier = q75_multi,
-    large_mulitplier = q99_multi
+    large_multiplier = q99_multi
   )
 
 ### Mannually fix the mean rainfall so its a decrease
@@ -128,7 +126,7 @@ just_mean_rainfall <- rainfall_control_and_multipliers |>
     small_change_parameter = q25,
     large_change_parameter = q1,
     small_multiplier = q25_multi,
-    large_mulitplier = q1_multi
+    large_multiplier = q1_multi
   )
 
 rainfall_temperate_parameters <- rbind(just_mean_rainfall, rainfall_temperate_parameters) |> 
@@ -140,6 +138,11 @@ rainfall_temperate_parameters <- rbind(just_mean_rainfall, rainfall_temperate_pa
     )
   )
 
+
+write_csv(
+  rainfall_temperate_parameters,
+  "./Results/rainfall_temperate_parameters.csv"
+  )
 
 ## 3.3 Tidy summary stats ready for plotting ===================================
 ### To add a overall to boxplot copy the entire tibble replace major climate 
@@ -324,7 +327,7 @@ partitioning_temperate_parameters <- partioning_control_and_multipliers |>
     small_change_parameter = q75,
     large_change_parameter = q99,
     small_multiplier = q75_multi,
-    large_mulitplier = q99_multi
+    large_multiplier = q99_multi
   )
 
 ### Mannually fix the mean rainfall so its a decrease
@@ -337,7 +340,7 @@ just_intercept <- partioning_control_and_multipliers |>
     small_change_parameter = q25,
     large_change_parameter = q1,
     small_multiplier = q25_multi,
-    large_mulitplier = q1_multi
+    large_multiplier = q1_multi
   )
 
 partitioning_temperate_parameters <- rbind(just_intercept, partitioning_temperate_parameters) |> 
@@ -351,6 +354,10 @@ partitioning_temperate_parameters <- rbind(just_intercept, partitioning_temperat
 
 
 
+write_csv(
+  partitioning_temperate_parameters,
+  "./Results/partitioning_temperate_parameters.csv"
+)
 
 
 ### Again, this is to add Overall to facets
