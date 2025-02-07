@@ -1,7 +1,7 @@
 # Estimating parameters
 
 # TODO:
-# 3. Fix up n = count for the boxplots
+# 3. Fix up n = count for the boxplots (geom_text?)
 # 4. Try scatter plot method
 
 
@@ -38,6 +38,10 @@ gauge_info <- read_csv(
     )
   )
 
+start_stop_index <- read_csv(
+  "./Data/Tidy/start_stop_index.csv",
+  show_col_types = FALSE
+)
 
 # 2. Examine variety of climate types ------------------------------------------
 number_climate_types <- gauge_info |> 
@@ -255,6 +259,67 @@ summary_intercept_and_slope <- line_of_best_fit_per_catchment |>
 
 
 ## 4.2 Calculate boxcox streamflow autocorrelation per gauge ===================
+## Autocorrelation should be taken from continuous periods for a given
+## gauge then averaged rather than removing the auto
+## Taking auto by removing na seems to over-inflate autocorrelation
+
+
+
+split_gauge_data_into_start_stop <- function(start_index, stop_index, gauge_data) {
+  gauge_data |> 
+    slice(start_index:stop_index)
+}
+
+# psuedo code
+autocorrelation_each_continuous_segment <- function(gauge, start_stop, data) {
+  
+  # 1. Get a gauge
+  gauge_data <- data |> 
+    filter(gauge == {{ gauge }})
+  
+  start_stop_gauge <- start_stop |> 
+    filter(gauge == {{ gauge }})
+  
+  
+  # 2. split gauge into continuous list segments using:
+  ##   split_gauge_data_into_start_stop
+  split_gauge <- map2(
+    .x = start_stop_gauge |> pull(start_index),
+    .y = start_stop_gauge |> pull(end_index),
+    .f = split_gauge_data_into_start_stop,
+    gauge_data = gauge_data
+  )
+  
+  # 3. Calculate the autocorrelation for each segment
+  auto_each_segment <- map_dbl(
+    .x = split_gauge,
+    .f = function(x) {acf(x$bc_q, plot = FALSE)$acf[2]}
+  )
+  
+  # 4. Average the autocorrelation for each segment
+  return(mean(auto_each_segment))
+}
+
+
+ave_segmented_autocorrelation <- map_dbl(
+  .x = data |> pull(gauge) |> unique(), 
+  .f = autocorrelation_each_continuous_segment,
+  start_stop = start_stop_index,
+  data = data
+  )
+
+summary_ave_segmented_autocorrelation <- tibble(
+  gauge = data |> pull(gauge) |> unique(),
+  Autocorrelation = ave_segmented_autocorrelation
+) |> 
+  pivot_longer(
+    cols = Autocorrelation,
+    names_to = "metric",
+    values_to = "values"
+  )
+
+
+# This mean seems to inflate autocorrelation
 summary_autocorrelation <- data |> 
   summarise(
     Autocorrelation = get_lag_1_autocorrelation(bc_q),
@@ -298,7 +363,7 @@ summary_spread_and_shape <- spread_and_shape_around_line_of_best_fit |>
 
 summary_partitioning <- rbind(
   summary_intercept_and_slope,
-  summary_autocorrelation,
+  summary_ave_segmented_autocorrelation,
   summary_spread_and_shape
   ) |>
 left_join(
@@ -322,13 +387,17 @@ partioning_control_and_multipliers <- summary_partitioning |>
   summarise(
     # this probably should be map then expand the list 
     # rather than copy and pasting the same function many times
+    # gradually increase percentile until a clear change is seen or 
+    # until max percentile or limitation in method (skewed normal)
     median = median(values),
     q5 = quantile(values, 0.05, names = FALSE), 
     q25 = quantile(values, 0.25, names = FALSE),
+    q35 = quantile(values, 0.35, names = FALSE),
     q65 = quantile(values, 0.65, names = FALSE),
     q75 = quantile(values, 0.75, names = FALSE),
     q80 = quantile(values, 0.8, names = FALSE),
     q95 = quantile(values, 0.95, names = FALSE),
+    q98 = quantile(values, 0.98, names = FALSE),
     q99 = quantile(values, 0.99, names = FALSE),
     .by = c(metric, major_climate_type)
   ) 
@@ -353,8 +422,8 @@ partitioning_temperate_parameters <- pmap(
     # Auto large q99
     # Sd large q80
     # Skew large q95 (can't do q99 due to skewness limits)
-    c("q25", "q65", "q75", "q75", "q75"), # small change
-    c("q5", "q95", "q99", "q80", "q95") # large change
+    c("q35", "q65", "q75", "q75", "q75"), # small change
+    c("q5", "q95", "q99", "q80", "q98") # large change
   ),
   .f = make_control_and_multiplier_parameters,
   data = temperate_partioning_control_and_multipliers

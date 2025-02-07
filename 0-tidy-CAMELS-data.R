@@ -8,6 +8,7 @@ cat("\014")
 # Import libraries -------------------------------------------------------------
 library(MASS) # boxcox conversion
 library(tidyverse)
+library(checkmate) # start stop indexes
 # kgc used for finding climate zones 
 # kgc loads dependencies that conflict with tidyverse call kgc:: instead
 
@@ -95,6 +96,46 @@ yearly_data <- yearly_precip |>
   right_join(yearly_streamflow, by = join_by(gauge, year)) 
 
 
+
+## Continuous runs of data =====================================================
+## Find the start and end of all continous streamflow measurements.
+## Return a n x m matrix where m[1] = start_index, m[2] = end_index
+
+
+gauge_continous_start_end <- function(single_gauge, data, min_run_length) {
+  gauge_specific_data <- data |>
+    filter(single_gauge == gauge)
+  
+  start_end_matrix <- continuous_run_start_end(gauge_specific_data$q_mm) # apply it to every gauge.
+  
+  start_end_matrix |>
+    as_tibble() |>
+    mutate(length = end_index - start_index + 1) |> # + 1 to make the input more easy to understand
+    filter(length > min_run_length - 1) 
+}
+
+
+list_start_end_index <- map(
+  .x = unique(yearly_data$gauge),
+  .f = gauge_continous_start_end,
+  data = yearly_data,
+  min_run_length = min_run_length 
+) 
+
+names(list_start_end_index) <- paste0("gauge_", unique(yearly_data$gauge))
+
+start_end_index <- do.call("rbind", list_start_end_index)
+
+start_end_index <- start_end_index |>
+  rownames_to_column(var = "gauge") |>
+  as_tibble() |>
+  mutate(gauge = str_remove(gauge, "\\.[1-9]")) |>
+  mutate(gauge = str_remove(gauge, "gauge_")) # remove anything with "." followed by a number
+
+write_csv(
+  start_end_index,
+  file = "./Data/Tidy/start_stop_index.csv"
+)
 
 # 3. Find boxcox transform value for each gauge --------------------------------
 gauge_info <- yearly_data |>
