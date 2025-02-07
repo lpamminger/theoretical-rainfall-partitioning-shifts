@@ -334,6 +334,7 @@ partioning_control_and_multipliers <- summary_partitioning |>
     median = median(values),
     q5 = quantile(values, 0.05, names = FALSE), 
     q25 = quantile(values, 0.25, names = FALSE),
+    q65 = quantile(values, 0.65, names = FALSE),
     q75 = quantile(values, 0.75, names = FALSE),
     q80 = quantile(values, 0.8, names = FALSE),
     q95 = quantile(values, 0.95, names = FALSE),
@@ -361,7 +362,7 @@ partitioning_temperate_parameters <- pmap(
     # Auto large q99
     # Sd large q80
     # Skew large q95 (can't do q99 due to skewness limits)
-    c("q25", "q75", "q75", "q75", "q75"), # small change
+    c("q25", "q65", "q75", "q75", "q75"), # small change
     c("q5", "q95", "q99", "q80", "q95") # large change
   ),
   .f = make_control_and_multiplier_parameters,
