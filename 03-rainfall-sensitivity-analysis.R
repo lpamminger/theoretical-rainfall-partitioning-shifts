@@ -3,7 +3,7 @@
 # Clear environment and console ------------------------------------------------
 rm(list = ls())
 cat("\014")
-par(mfrow = c(1,1))
+par(mfrow = c(1, 1))
 
 
 # Import libraries--------------------------------------------------------------
@@ -11,9 +11,9 @@ pacman::p_load(sn, moments, tidyverse)
 
 
 # Import functions -------------------------------------------------------------
-source("./Functions/box_cox_transforms.R")
+source("./Functions/boxcox_transforms.R")
 source("./Functions/adjusting_parameters.R")
-source("./Functions/synthetic_streamflow_model.R") 
+source("./Functions/synthetic_streamflow_model.R")
 source("./Functions/modified_stochastic_rainfall_generator.R")
 source("./Functions/utility.R")
 
@@ -37,10 +37,11 @@ control_parameters <- c(
 ## Setting up parameter sets list ==============================================
 multipliers_for_control_parameters <- c(0.8, 1.3, 5, 5)
 
-change_parameters <- imap(.x = multipliers_for_control_parameters, 
-                          .f = change_parameter_set_function, 
-                          control_parameter_set = control_parameters
-                          )
+change_parameters <- imap(
+  .x = multipliers_for_control_parameters,
+  .f = change_parameter_set_function,
+  control_parameter_set = control_parameters
+)
 
 parameter_list <- c(list(control_parameters), change_parameters)
 
@@ -54,11 +55,12 @@ names(parameter_list) <- c(
 
 
 ## Put the parameters through the stochastic rainfall generator ============
-rainfall_list <- map(.x = parameter_list,
-                     .f = modified_stochastic_rainfall_generator,
-                     length_of_generated_rainfall = time_series_length,
-                     set_seed = TRUE
-                     )
+rainfall_list <- map(
+  .x = parameter_list,
+  .f = modified_stochastic_rainfall_generator,
+  length_of_generated_rainfall = time_series_length,
+  set_seed = TRUE
+)
 
 
 
@@ -70,48 +72,51 @@ streamflow_parameters <- c(-4.1, 0.017, 0.16, 2, 0.014)
 
 ### Part 1 of function factory - store the control values
 change_synthetic_streamflow_model <- synthetic_streamflow_model(
-                                       control_parameters = streamflow_parameters, 
-                                       control_rainfall = rainfall_list$control,
-                                       set_seed = TRUE
-                                       )
+  control_parameters = streamflow_parameters,
+  control_rainfall = rainfall_list$control,
+  set_seed = TRUE
+)
 
 
 
 ## Make the precipitation the first argument so I can loop over ================
 modified_change_synthetic_streamflow_model <- function(change_rainfall, change_parameters) {
-  change_synthetic_streamflow_model(change_parameters = change_parameters,
-                                    change_rainfall = change_rainfall)
+  change_synthetic_streamflow_model(
+    change_parameters = change_parameters,
+    change_rainfall = change_rainfall
+  )
 }
 
 
 ### Part 2 of function factory - add the change values
-boxcox_streamflow_list <- map(.x = rainfall_list[-1], # exclude control
-                              .f = modified_change_synthetic_streamflow_model, 
-                              change_parameters = streamflow_parameters
-                              )
+boxcox_streamflow_list <- map(
+  .x = rainfall_list[-1], # exclude control
+  .f = modified_change_synthetic_streamflow_model,
+  change_parameters = streamflow_parameters
+)
 
 
 # add another column
-for (item in seq_along(boxcox_streamflow_list)){
+for (item in seq_along(boxcox_streamflow_list)) {
   boxcox_streamflow_list[[item]] <- cbind(
-                                      as_tibble(boxcox_streamflow_list[[item]][(skip + 1):nrow(boxcox_streamflow_list[[item]]),]), 
-                                      names(parameter_list[-1])[item], 
-                                      seq(from = 1, to = nrow(boxcox_streamflow_list[[item]][(skip + 1):nrow(boxcox_streamflow_list[[item]]),]))
-                                      )
+    as_tibble(boxcox_streamflow_list[[item]][(skip + 1):nrow(boxcox_streamflow_list[[item]]), ]),
+    names(parameter_list[-1])[item],
+    seq(from = 1, to = nrow(boxcox_streamflow_list[[item]][(skip + 1):nrow(boxcox_streamflow_list[[item]]), ]))
+  )
 }
 
 boxcox_streamflow <- do.call("rbind", boxcox_streamflow_list)
 
-boxcox_streamflow <- boxcox_streamflow |> 
-                       rename(
-                         parameter = `names(parameter_list[-1])[item]`,
-                         time = `seq(from = 1, to = nrow(boxcox_streamflow_list[[item]][(skip + `
-                       ) |> 
-                       remove_rownames() |> 
-                       relocate(
-                         c(parameter, time),
-                         .before = 1
-                         )
+boxcox_streamflow <- boxcox_streamflow |>
+  rename(
+    parameter = `names(parameter_list[-1])[item]`,
+    time = `seq(from = 1, to = nrow(boxcox_streamflow_list[[item]][(skip + `
+  ) |>
+  remove_rownames() |>
+  relocate(
+    c(parameter, time),
+    .before = 1
+  )
 
 
 
@@ -120,46 +125,55 @@ boxcox_streamflow <- boxcox_streamflow |>
 ## So I will use multiple steps
 
 get_boxcox_streamflow_into_tidy <- function(name_1, name_2, value_to_name, data) {
-  
-  data |> 
-    select(parameter, time, {{ name_1 }}, {{ name_2 }}) |> 
+  data |>
+    select(parameter, time, {{ name_1 }}, {{ name_2 }}) |>
     pivot_longer(
       cols = !c(parameter, time),
       names_to = "control_or_change",
       values_to = value_to_name
-    ) |> 
+    ) |>
     mutate(
       control_or_change = str_extract(control_or_change, "control|change")
     )
 }
 
-name_1 <- boxcox_streamflow |> 
-  select(starts_with("control")) |> 
+name_1 <- boxcox_streamflow |>
+  select(starts_with("control")) |>
   names()
 
-name_2 <- boxcox_streamflow |> 
-  select(starts_with("change")) |> 
+name_2 <- boxcox_streamflow |>
+  select(starts_with("change")) |>
   names()
 
 
 value_to_name <- c("rainfall", "boxcox_streamflow")
 
-tidy_boxcox_streamflow <- pmap(.l = list(name_1, name_2, value_to_name),
-                               .f = get_boxcox_streamflow_into_tidy,
-                               data = boxcox_streamflow)
+tidy_boxcox_streamflow <- pmap(
+  .l = list(name_1, name_2, value_to_name),
+  .f = get_boxcox_streamflow_into_tidy,
+  data = boxcox_streamflow
+)
 
-tidy_boxcox_streamflow <- purrr::reduce(tidy_boxcox_streamflow, left_join, by = join_by(parameter, time, control_or_change))
+tidy_boxcox_streamflow <- purrr::reduce(
+  tidy_boxcox_streamflow, 
+  left_join, 
+  by = join_by(
+    parameter, 
+    time, 
+    control_or_change
+    )
+  )
 
 
 ### Convert from boxcox to real space ##########################################
 #### When talking the average of hState and CAMELS catchments is around 0.3
-boxcox_lambda <- 0.3 #o.g. = 0.3
+boxcox_lambda <- 0.3 # o.g. = 0.3
 
-tidy_boxcox_streamflow <- tidy_boxcox_streamflow |> 
-                            mutate(
-                              streamflow = BCTransformInverse(boxcox_streamflow, lambda = boxcox_lambda)
-                            )                             
-                            
+tidy_boxcox_streamflow <- tidy_boxcox_streamflow |>
+  mutate(
+    streamflow = boxcox_inverse_transformInverse(boxcox_streamflow, lambda = boxcox_lambda)
+  )
+
 
 
 
@@ -168,12 +182,12 @@ tidy_boxcox_streamflow <- tidy_boxcox_streamflow |>
 
 # Are the differences in these values due to the random number set? Test using replicates...
 
-statistical_properties <- tidy_boxcox_streamflow |> 
+statistical_properties <- tidy_boxcox_streamflow |>
   summarise(
     intercept = coef(lm(boxcox_streamflow ~ rainfall))[1],
     slope = coef(lm(boxcox_streamflow ~ rainfall))[2],
     .by = c(parameter, control_or_change)
-  ) |> 
+  ) |>
   arrange()
 
 
@@ -228,8 +242,9 @@ main_plot <- tidy_boxcox_streamflow |>
 
 
 abc_labels <- data.frame(
-  label = paste0(letters[1:length(control_parameters)], ")"), 
-  parameter = unique(tidy_boxcox_streamflow$parameter)) |>
+  label = paste0(letters[1:length(control_parameters)], ")"),
+  parameter = unique(tidy_boxcox_streamflow$parameter)
+) |>
   geom_text(
     mapping = aes(
       x = max(tidy_boxcox_streamflow$rainfall),
@@ -247,12 +262,12 @@ rainfall_runoff_plot <- main_plot + abc_labels
 # Save results -----------------------------------------------------------------
 ## Rainfall-runoff relationship ================================================
 ggsave(paste0("./Graphs/rainfall_sensitivity_bc_rainfall_runoff_a4_page_", get_date(), ".pdf"),
-       plot = rainfall_runoff_plot,
-       device = "pdf",
-       units = "mm",
-       width = 210,
-       height = 210
-       ) 
+  plot = rainfall_runoff_plot,
+  device = "pdf",
+  units = "mm",
+  width = 210,
+  height = 210
+)
 
 
 
@@ -260,18 +275,18 @@ ggsave(paste0("./Graphs/rainfall_sensitivity_bc_rainfall_runoff_a4_page_", get_d
 rainfall_runoff_streamflow_changes <- read_csv("./Results/rainfall_runoff_streamflow_changes.csv", show_col_types = FALSE)
 
 # I am only interested in comparing the mean - intercept and sd and sd
-tidy_rainfall_runoff_rainfall_changes <- tidy_boxcox_streamflow |> 
-  filter(parameter %in% c("mean", "standard_deviation")) |> 
-  add_column(model = "Synthetic Streamflow Model", .before = 1) 
+tidy_rainfall_runoff_rainfall_changes <- tidy_boxcox_streamflow |>
+  filter(parameter %in% c("mean", "standard_deviation")) |>
+  add_column(model = "Synthetic Streamflow Model", .before = 1)
 
 
 tidy_rainfall_runoff_streamflow_changes <- rainfall_runoff_streamflow_changes |>
-  filter(parameter %in% c("intercept", "standard_deviation")) |> 
-  add_column(model = "Stochastic Rainfall Model", .before = 1) |> 
+  filter(parameter %in% c("intercept", "standard_deviation")) |>
+  add_column(model = "Stochastic Rainfall Model", .before = 1) |>
   select(colnames(tidy_rainfall_runoff_rainfall_changes))
 
 
-streamflow_comparison <- rbind(tidy_rainfall_runoff_streamflow_changes, tidy_rainfall_runoff_rainfall_changes) |> 
+streamflow_comparison <- rbind(tidy_rainfall_runoff_streamflow_changes, tidy_rainfall_runoff_rainfall_changes) |>
   mutate(
     change_type = if_else(parameter == "standard_deviation", "Change in Peaks and Troughs", "Change in Vertical Axis"),
     parameter = if_else((parameter == "standard_deviation") & (model == "Stochastic Rainfall Model"), "standard_deviation_r", parameter)
@@ -304,7 +319,7 @@ streamflow_comparison_plot <- streamflow_comparison |>
     legend.text = element_text(size = 13),
     axis.title = element_text(size = 13),
     strip.text = element_text(size = 10)
-  ) 
+  )
 
 
 
@@ -324,23 +339,15 @@ abc_labels_streamflow <- data.frame(
     ),
     inherit.aes = FALSE,
     size = 6
-  ) 
+  )
 
 
 final_streamflow_comparison_plot <- streamflow_comparison_plot + abc_labels_streamflow
 
 ggsave(paste0("./Graphs/streamflow_comparison_", get_date(), ".pdf"),
-       plot = final_streamflow_comparison_plot,
-       device = "pdf",
-       width = 210,
-       height = 135,
-       units = "mm"
-       )
-
-
-
-
-
-
-
-
+  plot = final_streamflow_comparison_plot,
+  device = "pdf",
+  width = 210,
+  height = 135,
+  units = "mm"
+)
