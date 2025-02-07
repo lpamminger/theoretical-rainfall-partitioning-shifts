@@ -7,7 +7,9 @@ par(mfrow = c(1, 1))
 
 
 # Import libraries--------------------------------------------------------------
-pacman::p_load(sn, moments, tidyverse)
+library(tidyverse)
+library(sn) # synthetic_streamflow_model function requires sn package for skewed normal distribution
+library(moments) # stochastic_rainfall_generator function requires moments package
 
 
 # Import functions -------------------------------------------------------------
@@ -17,6 +19,17 @@ source("./Functions/synthetic_streamflow_model.R")
 source("./Functions/modified_stochastic_rainfall_generator.R")
 source("./Functions/utility.R")
 
+# Import control and parameter multipliers -------------------------------------
+partitioning_temperate_parameters <- read_csv(
+  "Results/partitioning_temperate_parameters.csv",
+  show_col_types = FALSE
+) 
+
+rainfall_temperate_parameters <- read_csv(
+  "Results/rainfall_temperate_parameters.csv",
+  show_col_types = FALSE
+)
+
 
 # Length of timeseries ---------------------------------------------------------
 skip <- 2
@@ -25,17 +38,17 @@ time_series_length <- user_time_series_length + skip # we remove the first two v
 
 
 ## Control parameters are based on sample rainfall =============================
-control_parameters <- c(
-  "mean" = 1006,
-  "sd" = 221,
-  "auto" = 0.015,
-  "skew" = 0.19
-)
+control_parameters <- rainfall_temperate_parameters |> pull(control)
 
 
 
 ## Setting up parameter sets list ==============================================
-multipliers_for_control_parameters <- c(0.8, 1.3, 5, 5)
+multipliers_for_control_parameters <- rainfall_temperate_parameters |> pull(small_multiplier)
+
+# Little change for autocorrelation and skewness with small_change
+# Use 99th percentile
+multipliers_for_control_parameters[3:4] <- rainfall_temperate_parameters$large_multiplier[3:4]
+
 
 change_parameters <- imap(
   .x = multipliers_for_control_parameters,
@@ -65,7 +78,7 @@ rainfall_list <- map(
 
 
 # Generate streamflow using the generated rainfall -----------------------------
-streamflow_parameters <- c(-4.1, 0.017, 0.16, 2, 0.014)
+streamflow_parameters <- partitioning_temperate_parameters |> pull(control)
 
 
 ## Apply model =================================================================
@@ -171,7 +184,7 @@ boxcox_lambda <- 0.3 # o.g. = 0.3
 
 tidy_boxcox_streamflow <- tidy_boxcox_streamflow |>
   mutate(
-    streamflow = boxcox_inverse_transformInverse(boxcox_streamflow, lambda = boxcox_lambda)
+    streamflow = boxcox_inverse_transform(boxcox_streamflow, lambda = boxcox_lambda)
   )
 
 

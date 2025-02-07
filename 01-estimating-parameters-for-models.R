@@ -88,19 +88,10 @@ rainfall_control_and_multipliers <- summary_rainfall_stat |>
     q5 = quantile(values, 0.05, names = FALSE), 
     q25 = quantile(values, 0.25, names = FALSE),
     q75 = quantile(values, 0.75, names = FALSE),
-    #q80 = quantile(values, 0.8, names = FALSE),
     q95 = quantile(values, 0.95, names = FALSE),
-    #q99 = quantile(values, 0.99, names = FALSE),
+    q99 = quantile(values, 0.99, names = FALSE),
     .by = c(metric, major_climate_type)
-  ) |> 
-  mutate(
-    q5_multi = q5 / median,
-    q25_multi = q25 / median,
-    q75_multi = q75 / median,
-    #q80_multi = q80 / median,
-    q95_multi = q95 / median#,
-    #q99_multi = q99 / median
-  )
+  ) 
 
 
 ### make_control_and_multiplier_parameters function ############################
@@ -146,7 +137,7 @@ rainfall_temperate_parameters <- pmap(
     # Autocorrelation small q75, large q95
     # Skewness small q75, large q95
     c("q25", "q75", "q75", "q75"), # small change
-    c("q5", "q95", "q95", "q95") # large change
+    c("q5", "q95", "q99", "q99") # large change
   ),
   .f = make_control_and_multiplier_parameters,
   data = temperate_rainfall_control_and_multipliers
