@@ -13,12 +13,6 @@ library(moments) # stochastic_rainfall_generator function requires moments packa
 
 
 
-
-# TODO:
-# - fix inset histogram (it is off centre)
-
-
-
 # Import functions -------------------------------------------------------------
 source("./Functions/boxcox_transforms.R")
 source("./Functions/synthetic_streamflow_model.R")

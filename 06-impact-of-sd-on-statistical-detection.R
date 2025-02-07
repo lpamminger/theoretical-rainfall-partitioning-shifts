@@ -3,159 +3,173 @@
 # Clear environment and console ------------------------------------------------
 rm(list = ls())
 cat("\014")
-par(mfrow = c(1,1))
+par(mfrow = c(1, 1))
 
 
 # Import libraries--------------------------------------------------------------
-pacman::p_load(sn, moments, tidyverse, furrr, parallel)
+library(tidyverse)
+library(sn) # synthetic_streamflow_model function requires sn package for skewed normal distribution
+library(moments) # stochastic_rainfall_generator function requires moments package
+library(parallel)
+library(future)
+library(furrr)
+
+
 
 
 # Import functions -------------------------------------------------------------
 source("./Functions/adjusting_parameters.R")
-source("./Functions/synthetic_streamflow_model.R") 
+source("./Functions/synthetic_streamflow_model.R")
 source("./Functions/modified_stochastic_rainfall_generator.R")
 source("./Functions/utility.R")
+
+
+# Import control and parameter multipliers -------------------------------------
+partitioning_temperate_parameters <- read_csv(
+  "Results/partitioning_temperate_parameters.csv",
+  show_col_types = FALSE
+)
+
+rainfall_temperate_parameters <- read_csv(
+  "Results/rainfall_temperate_parameters.csv",
+  show_col_types = FALSE
+)
 
 
 
 # Generate observations --------------------------------------------------------
 ## Generation parameters =======================================================
-pre_shift_length_years <- 100 
+pre_shift_length_years <- 100
 post_shift_length_years <- 100
 streamflow_parameter_multipliers <- c(1.1, 1.25, 1.5)
 
-rainfall_parameters <- c("mean" = 1006,
-                         "sd" = 221,
-                         "auto" = 0.015,
-                         "skew" = 0.19
-                         )
-
-
+rainfall_parameters <- rainfall_temperate_parameters |> pull(control)
 
 
 # Statistical test function ----------------------------------------------------
-p_value_generator_residuals <- function(parameter_position_index, streamflow_multiplier, post_rainfall_variation_years, normal_sd, detection_function){
-  
+p_value_generator_residuals <- function(parameter_position_index, streamflow_multiplier, post_rainfall_variation_years, normal_sd, detection_function) {
   if (normal_sd) {
-    streamflow_parameters <- c(
-      "a0" = -4.1,
-      "a1" = 0.017,
-      "a2" = 0.16,
-      "a3" = 2,
-      "a4" = 0.014
-    ) # Must be between -0.99 and 0.99
+    streamflow_parameters <- partitioning_temperate_parameters |> pull(control)
   } else if (!normal_sd) {
-    streamflow_parameters <- c(
-      "a0" = -4.1,
-      "a1" = 0.017,
-      "a2" = 0.16,
-      "a3" = 0.5,
-      "a4" = 0.014
-    ) # Must be between -0.99 and 0.99
+    streamflow_parameters <- partitioning_temperate_parameters |> pull(control)
+    streamflow_parameters[4] <- streamflow_parameters[4] / 4
   }
 
-  
+
   ## p_value_generator_residuals information ===================================
   # This functions relies on global variables:
   ## - the rainfall/streamflow generators
   ## - pre/post shift lengths
   ## - the streamflow and rainfall parameter vectors
-  
+
   # Inputs:
   ## - parameter_position_index - c(a0, a1, a2, a3, a4) = c(1, 2, 3, 4, 5)
   ## - streamflow_multiplier - multiplier to parameter
   ## - post_rainfall_variation_year - years
-  
-  
+
+
   ### Pre-rainfall #############################################################
-  pre_rainfall <- modified_stochastic_rainfall_generator(parameter_vector = rainfall_parameters, 
-                                                         length_of_generated_rainfall = pre_shift_length_years,
-                                                         set_seed = FALSE)
-  
-  
+  pre_rainfall <- modified_stochastic_rainfall_generator(
+    parameter_vector = rainfall_parameters,
+    length_of_generated_rainfall = pre_shift_length_years,
+    set_seed = FALSE
+  )
+
+
   ### Change-rainfall ##########################################################
-  change_rainfall <- modified_stochastic_rainfall_generator(parameter_vector = rainfall_parameters, 
-                                                            length_of_generated_rainfall = post_shift_length_years,
-                                                            set_seed = FALSE)
-  
-  
+  change_rainfall <- modified_stochastic_rainfall_generator(
+    parameter_vector = rainfall_parameters,
+    length_of_generated_rainfall = post_shift_length_years,
+    set_seed = FALSE
+  )
+
+
   ### Apply synthetic_streamflow model #########################################
 
-  
+
   ### Change-streamflow ########################################################
   ## Apply a single multiplier to a single streamflow parameter
-  change_streamflow_parameters <- change_parameter_set_function(multiplier = streamflow_multiplier,
-                                                                parameter_to_change = parameter_position_index, # the position of parameter in streamflow_parameters
-                                                                control_parameter_set = streamflow_parameters)
-  
-  if (abs(change_streamflow_parameters[length(change_streamflow_parameters)]) >= 1) {stop("skewness cannot be greater than abs(1)")}
-  
+  change_streamflow_parameters <- change_parameter_set_function(
+    multiplier = streamflow_multiplier,
+    parameter_to_change = parameter_position_index, # the position of parameter in streamflow_parameters
+    control_parameter_set = streamflow_parameters
+  )
 
-  
+  if (abs(change_streamflow_parameters[length(change_streamflow_parameters)]) >= 1) {
+    stop("skewness cannot be greater than abs(1)")
+  }
+
+
+
   change_synthetic_streamflow_model <- synthetic_streamflow_model(
-                                        control_parameters = streamflow_parameters, 
-                                        control_rainfall = pre_rainfall,
-                                        set_seed = FALSE
-                                        )
-                                      
-  
+    control_parameters = streamflow_parameters,
+    control_rainfall = pre_rainfall,
+    set_seed = FALSE
+  )
+
+
   all_streamflow <- change_synthetic_streamflow_model(
-                      change_parameters = change_streamflow_parameters,
-                      change_rainfall = change_rainfall
-                      )
-  
+    change_parameters = change_streamflow_parameters,
+    change_rainfall = change_rainfall
+  )
+
   pre_streamflow <- all_streamflow[, 2]
   change_streamflow <- all_streamflow[, 4]
-  
-  
-  
+
+
+
   ### Residual calculation #####################################################
   # - fit a linear model to the mean_only_pre_streamflow and pre_rainfall
   # - use the linear model fitted to pre conditions to predict change streamflow using change rainfall
   # - change residauls = modelled_changed_streamflow - linear_model predicted streamflow using pre_conditions
-  
-  
+
+
   #### Find linear relationship between control rainfall and runoff ############
   linear_model_control <- lm(pre_streamflow ~ pre_rainfall) # line
-  
+
   fitted_values <- linear_model_control[["fitted.values"]]
-  
-  pre_residuals <- pre_streamflow -  fitted_values # pre-dot to pre-line distance
-  
-  pre_linear_model_coefficients <- c("intercept" = coef(linear_model_control)[1], 
-                                     "slope" = coef(linear_model_control)[2])
-  
+
+  pre_residuals <- pre_streamflow - fitted_values # pre-dot to pre-line distance
+
+  pre_linear_model_coefficients <- c(
+    "intercept" = coef(linear_model_control)[1],
+    "slope" = coef(linear_model_control)[2]
+  )
+
   #### Apply pre_linear_model_coefficients to change_rainfall ##################
-  #### to predict future streamflow 
-  predicted_streamflow <- pre_linear_model_coefficients[1] + 
+  #### to predict future streamflow
+  predicted_streamflow <- pre_linear_model_coefficients[1] +
     (pre_linear_model_coefficients[2] * change_rainfall)
-  
-  
+
+
   #### Find residual between change_streamflow and predicted_streamflow ########
   change_residuals <- change_streamflow - predicted_streamflow
-  
-  
+
+
   ### Apply test ###############################################################
-  if (detection_function == "ks.test"){
+  if (detection_function == "ks.test") {
     ks.test(pre_residuals, change_residuals[1:post_rainfall_variation_years])$p.value
-    
-  } else if (detection_function == "fligner.test"){
+  } else if (detection_function == "fligner.test") {
     # Fligner is special and wont work with two vectors
     # One vector contains the values and the other contains whether its pre/change
     modified_change_residuals <- change_residuals[1:post_rainfall_variation_years]
-    
-    combined_pre_change_residuals <- c(pre_residuals, 
-                                        modified_change_residuals)
-    
-    groups <- c(rep("pre", time = length(pre_residuals)), 
-                rep("change", time = length(modified_change_residuals))) 
-    
+
+    combined_pre_change_residuals <- c(
+      pre_residuals,
+      modified_change_residuals
+    )
+
+    groups <- c(
+      rep("pre", time = length(pre_residuals)),
+      rep("change", time = length(modified_change_residuals))
+    )
+
     fligner.test(x = combined_pre_change_residuals, g = groups)$p.value
   }
 }
 
-# Find all combination of multiplier, parameters and years tested -------------- 
-streamflow_parameters_index <- 3 #seq(from = 1, to = length(streamflow_parameters))
+# Find all combination of multiplier, parameters and years tested --------------
+streamflow_parameters_index <- 3 # seq(from = 1, to = length(streamflow_parameters))
 rainfall_variations <- seq(from = 10, to = post_shift_length_years)
 low_or_high_sd <- c(TRUE, FALSE)
 
@@ -169,11 +183,12 @@ all_combinations_parameter_multi_rainfall <- expand.grid(
 
 
 # Apply model to all combinations and replicates -------------------------------
-list_all_combinations_parameter_multi_rainfall <- list(all_combinations_parameter_multi_rainfall[,1], 
-                                                       all_combinations_parameter_multi_rainfall[,2], 
-                                                       all_combinations_parameter_multi_rainfall[,3],
-                                                       all_combinations_parameter_multi_rainfall[,4]
-                                                       )
+list_all_combinations_parameter_multi_rainfall <- list(
+  all_combinations_parameter_multi_rainfall[, 1],
+  all_combinations_parameter_multi_rainfall[, 2],
+  all_combinations_parameter_multi_rainfall[, 3],
+  all_combinations_parameter_multi_rainfall[, 4]
+)
 
 
 
@@ -182,35 +197,41 @@ max_replicates <- 1000L
 
 replicates <- seq(from = 1, to = max_replicates, by = 1)
 
-repeat_p_value_generator_wrapper <- function(replicate, detection_function){
-  
-  p_values <- pmap_dbl(.l = list_all_combinations_parameter_multi_rainfall, 
-                       .f = p_value_generator_residuals, 
-                       detection_function = detection_function,
-                       .progress = FALSE) 
-  
+repeat_p_value_generator_wrapper <- function(replicate, detection_function) {
+  p_values <- pmap_dbl(
+    .l = list_all_combinations_parameter_multi_rainfall,
+    .f = p_value_generator_residuals,
+    detection_function = detection_function,
+    .progress = FALSE
+  )
 }
 
 
 
 ## Run replicates in parallel ==================================================
 plan(multisession, workers = availableCores())
-ks_p_values_replicates <- future_map(.x = replicates, 
-                                     .f = repeat_p_value_generator_wrapper,
-                                     detection_function = "ks.test",
-                                     .options = furrr_options(
-                                       seed = 1L, 
-                                       globals = TRUE),
-                                     .progress = TRUE)
+ks_p_values_replicates <- future_map(
+  .x = replicates,
+  .f = repeat_p_value_generator_wrapper,
+  detection_function = "ks.test",
+  .options = furrr_options(
+    seed = 1L,
+    globals = TRUE
+  ),
+  .progress = TRUE
+)
 
 plan(multisession, workers = availableCores())
-fligner_p_values_replicates <- future_map(.x = replicates, 
-                                          .f = repeat_p_value_generator_wrapper,
-                                          detection_function = "fligner.test",
-                                          .options = furrr_options(
-                                            seed = 1L, 
-                                            globals = TRUE),
-                                          .progress = TRUE)
+fligner_p_values_replicates <- future_map(
+  .x = replicates,
+  .f = repeat_p_value_generator_wrapper,
+  detection_function = "fligner.test",
+  .options = furrr_options(
+    seed = 1L,
+    globals = TRUE
+  ),
+  .progress = TRUE
+)
 
 
 
@@ -252,22 +273,22 @@ making_summary_tibble <- function(surrogate_data_from_p_value_gen) {
 
 
 # Summary p_values =============================================================
-summary_ks_p_values <- making_summary_tibble(ks_p_values_replicates) |> 
+summary_ks_p_values <- making_summary_tibble(ks_p_values_replicates) |>
   add_column("ks_or_flig" = "Kolmogorov-Smirnov", .before = 1)
 
 
-summary_fligner_p_values <- making_summary_tibble(fligner_p_values_replicates) |> 
+summary_fligner_p_values <- making_summary_tibble(fligner_p_values_replicates) |>
   add_column("ks_or_flig" = "Fligner-Killeen", .before = 1)
 
 
-all_tests <- rbind(summary_ks_p_values, summary_fligner_p_values) |> 
+all_tests <- rbind(summary_ks_p_values, summary_fligner_p_values) |>
   mutate(
     low_or_high_sd = if_else(low_or_high_sd, "Large", "Small")
-    )
+  )
 
 
 
-summary_all_tests <- all_tests |> 
+summary_all_tests <- all_tests |>
   summarise(
     ave_p_value = mean(p_value),
     upper_p_value = quantile(p_value, 0.1), # can change
@@ -345,21 +366,18 @@ single_low_high_sd_plot <- summary_all_tests |>
 # Save graphs ------------------------------------------------------------------
 
 ggsave(paste0("./Graphs/how_low_high_sd_impacts_auto_detection", get_date(), ".pdf"),
-       plot = combined_low_high_sd_plot,
-       device = cairo_pdf,
-       units = "mm",
-       width = 210,
-       height = 110)
+  plot = combined_low_high_sd_plot,
+  device = cairo_pdf,
+  units = "mm",
+  width = 210,
+  height = 110
+)
 
 
 ggsave(paste0("./Graphs/single_how_low_high_sd_impacts_auto_detection", get_date(), ".pdf"),
-       plot = single_low_high_sd_plot,
-       device = cairo_pdf,
-       units = "mm",
-       width = 210,
-       height = 160)
-
-
-
-
-
+  plot = single_low_high_sd_plot,
+  device = cairo_pdf,
+  units = "mm",
+  width = 210,
+  height = 160
+)

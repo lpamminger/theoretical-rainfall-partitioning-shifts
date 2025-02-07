@@ -7,7 +7,13 @@ par(mfrow = c(1,1))
 
 
 # Import libraries--------------------------------------------------------------
-pacman::p_load(sn, moments, tidyverse, furrr, parallel)
+library(tidyverse)
+library(sn) # synthetic_streamflow_model function requires sn package for skewed normal distribution
+library(moments) # stochastic_rainfall_generator function requires moments package
+library(parallel)
+library(future)
+library(furrr)
+
 
 
 # Import functions -------------------------------------------------------------
@@ -17,26 +23,27 @@ source("./Functions/synthetic_streamflow_model.R")
 source("./Functions/utility.R")
 
 
+# Import control and parameter multipliers -------------------------------------
+partitioning_temperate_parameters <- read_csv(
+  "Results/partitioning_temperate_parameters.csv",
+  show_col_types = FALSE
+)
+
+rainfall_temperate_parameters <- read_csv(
+  "Results/rainfall_temperate_parameters.csv",
+  show_col_types = FALSE
+)
+
+
 # Generate observations --------------------------------------------------------
 ## Generation parameters =======================================================
 pre_shift_length_years <- 100
 post_shift_length_years <- 100
 streamflow_parameter_multipliers <- c(1.1, 1.25, 1.5)
 
-rainfall_parameters <- c(
-  "mean" = 1006,
-  "sd" = 221,
-  "auto" = 0.015,
-  "skew" = 0.19
-)
+rainfall_parameters <- rainfall_temperate_parameters |> pull(control)
 
-streamflow_parameters <- c(
-  "a0" = -4.1,
-  "a1" = 0.017,
-  "a2" = 0.16,
-  "a3" = 2,
-  "a4" = 0.014
-) # Must be between -0.99 and 0.99
+streamflow_parameters <- partitioning_temperate_parameters |> pull(control)
 
 parameter_names <- names(streamflow_parameters)
 
