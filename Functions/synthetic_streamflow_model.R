@@ -68,6 +68,10 @@ synthetic_streamflow_model <- function(control_parameters, control_rainfall, set
     change_stand_dev <- change_parameters[4]
     change_skew <- change_parameters[5]
     
+    if(abs(change_skew) >= 1) {
+      stop("abs(Skewness) must not be >= 1")
+    }
+    
     # change decay value
     change_decay_value <- change_intercept + (change_slope * mean(change_rainfall))
     
