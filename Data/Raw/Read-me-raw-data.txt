@@ -1,0 +1,7 @@
+Add CAMELS-AUS v2 files here. Cannot be added to github repo
+due to file size limitations
+
+Files to include:
+- CAMELS_AUS_Attributes&Indices_MasterTable.csv
+- precipitation_AGCD.csv
+- streamflow_mmd.csv
