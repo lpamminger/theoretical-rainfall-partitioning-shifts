@@ -319,7 +319,7 @@ y <- tidy_boxcox_streamflow |>
   pull(boxcox_streamflow_residual)
 
 # bins should be offset by:
-binwidth_offset <- max(abs(unique(y - x) / 2)) / 2
+binwidth_offset <- max(abs(unique(y - x) / 2)) 
 
 
 

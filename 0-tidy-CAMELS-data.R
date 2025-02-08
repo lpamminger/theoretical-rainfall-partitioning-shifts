@@ -16,7 +16,7 @@ library(checkmate) # start stop indexes
 source("./Functions/boxcox_transforms.R")
 source("./Functions/utility.R")
 
-# TODO: # remove gauges with less least 10 years of continuous data
+
 
 # 1. Import CAMELS v2 data -----------------------------------------------------
 

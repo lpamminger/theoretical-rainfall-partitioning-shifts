@@ -321,7 +321,9 @@ summary_ave_segmented_autocorrelation <- tibble(
   arrange(values)
 
 
-# This mean seems to inflate autocorrelation
+# Ignoring the NA values seems to inflate autocorrelation
+# Also ingnoring NA results in joining of non-consecutive years of streamflow
+# i.e., c(200, NA, NA, 300) becomes c(200, 300)
 #summary_autocorrelation <- data |> 
 #  summarise(
 #    Autocorrelation = get_lag_1_autocorrelation(bc_q),
