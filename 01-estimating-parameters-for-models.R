@@ -262,6 +262,7 @@ summary_intercept_and_slope <- line_of_best_fit_per_catchment |>
 ## Autocorrelation should be taken from continuous periods for a given
 ## gauge then averaged rather than removing the auto
 ## Taking auto by removing na seems to over-inflate autocorrelation
+## Mininum number of consecutive years is 10 (see min_run_length <- 10 in 0-file)
 
 
 
@@ -316,21 +317,22 @@ summary_ave_segmented_autocorrelation <- tibble(
     cols = Autocorrelation,
     names_to = "metric",
     values_to = "values"
-  )
+  ) |> 
+  arrange(values)
 
 
 # This mean seems to inflate autocorrelation
-summary_autocorrelation <- data |> 
-  summarise(
-    Autocorrelation = get_lag_1_autocorrelation(bc_q),
-    .by = gauge
-    ) |> 
-  # Make it the same format as other code
-  pivot_longer(
-    cols = Autocorrelation,
-    names_to = "metric",
-    values_to = "values"
-  )
+#summary_autocorrelation <- data |> 
+#  summarise(
+#    Autocorrelation = get_lag_1_autocorrelation(bc_q),
+#    .by = gauge
+#    ) |> 
+#  # Make it the same format as other code
+#  pivot_longer(
+#    cols = Autocorrelation,
+#    names_to = "metric",
+#    values_to = "values"
+#  )
 
 
 
@@ -369,9 +371,10 @@ summary_partitioning <- rbind(
 left_join(
   gauge_info,
   by = join_by(gauge)
-  )
+  ) 
 
-
+summary_partitioning |> 
+  filter(is.na(values))
 
 ## 4.5 Determine partitioning control and multiplier statistics ================
 ### Progressively step up percentiles until we see a change:

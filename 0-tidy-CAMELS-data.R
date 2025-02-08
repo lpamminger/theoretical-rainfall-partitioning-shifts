@@ -16,6 +16,7 @@ library(checkmate) # start stop indexes
 source("./Functions/boxcox_transforms.R")
 source("./Functions/utility.R")
 
+# TODO: # remove gauges with less least 10 years of continuous data
 
 # 1. Import CAMELS v2 data -----------------------------------------------------
 
@@ -57,7 +58,8 @@ catchment_information <- readr::read_csv(
 ## CONSTANTS ===================================================================
 acceptable_missing_streamflow_days <- 10
 minimum_entires_year <- 30 # at least 30 years of data required. Copied from HRS
-min_run_length <- 2
+min_run_length <- 10 # mainly for autocorrelation parameter estimation
+
 
 
 ## Yearly data =================================================================
@@ -136,6 +138,14 @@ write_csv(
   start_end_index,
   file = "./Data/Tidy/start_stop_index.csv"
 )
+
+gauges_in_start_end <- start_end_index |> pull(gauge) |> unique()
+
+## Not all gauges have at a continuous period of at least min_run_length years
+## Remove from yearly_data
+## This is mainly to avoid having over-inflated autocorrelation values
+yearly_data <- yearly_data |> 
+  filter(gauge %in% gauges_in_start_end)
 
 # 3. Find boxcox transform value for each gauge --------------------------------
 gauge_info <- yearly_data |>
