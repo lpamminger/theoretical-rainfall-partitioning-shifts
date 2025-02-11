@@ -14,8 +14,6 @@ library(future)
 library(furrr)
 
 
-# TODO: 
-# - code broken when running replicates_rainfall_runoff - FIX
 
 # Import functions -------------------------------------------------------------
 source("./Functions/adjusting_parameters.R")
