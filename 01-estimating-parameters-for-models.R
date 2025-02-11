@@ -140,8 +140,8 @@ rainfall_temperate_parameters <- pmap(
     # SD small q75, large q95
     # Autocorrelation small q75, large q95
     # Skewness small q75, large q95
-    c("q25", "q75", "q75", "q75"), # small change
-    c("q5", "q95", "q99", "q99") # large change
+    c("q25", "q25", "q75", "q75"), # small change
+    c("q5", "q5", "q99", "q99") # large change
   ),
   .f = make_control_and_multiplier_parameters,
   data = temperate_rainfall_control_and_multipliers
