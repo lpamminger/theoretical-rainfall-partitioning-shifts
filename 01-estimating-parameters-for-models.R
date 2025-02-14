@@ -1,15 +1,14 @@
 # Estimating parameters
 
-# TODO:
-# 3. Fix up n = count for the boxplots (geom_text?)
-# 4. Try scatter plot method
-
-
 
 # Clear environment and console ------------------------------------------------
 rm(list = ls())
 cat("\014")
 
+
+# TODO: 
+# - add orange line to legend in boxplots
+# - make text larger in figure (facet, x and y labels, axis labels)
 
 # Import libraries -------------------------------------------------------------
 library(tidyverse)
@@ -154,8 +153,20 @@ rainfall_temperate_parameters <- pmap(
       metric, 
       levels = c("Mean", "Standard Deviation", "Autocorrelation", "Skewness")
     )
-  )
+  ) 
 
+
+## Add selected multiplier for dashed-line plot (based on 03 file)
+selected_change <- rainfall_temperate_parameters |> pull(small_change)
+
+# Little change for autocorrelation and skewness with small_change
+# Use 99th percentile
+selected_change[3:4] <- rainfall_temperate_parameters$large_change[3:4]
+
+rainfall_temperate_parameters <- rainfall_temperate_parameters |> 
+  add_column(
+    selected_change = selected_change
+  )
 
 
 write_csv(
@@ -187,6 +198,7 @@ plot_summary_rainfall_stat <- summary_rainfall_stat |>
 
 ## 3.4 Boxplot of rainfall statistics ==========================================
 rainfall_boxplot <- plot_summary_rainfall_stat |> 
+  filter(major_climate_type != "Overall") |> 
   ggplot(aes(x = major_climate_type, y = values, fill = major_climate_type)) +
   geom_boxplot(
     show.legend = FALSE,
@@ -194,17 +206,10 @@ rainfall_boxplot <- plot_summary_rainfall_stat |>
     staplewidth = 0.25
     ) +
   geom_hline(
-    aes(yintercept = small_change), 
+    aes(yintercept = selected_change), 
     data = rainfall_temperate_parameters,
-    linetype = "dashed",
+    linetype = "longdash",
     colour = "#ff7f00",
-    linewidth = 1
-  ) +
-  geom_hline(
-    aes(yintercept = large_change), 
-    data = rainfall_temperate_parameters,
-    linetype = "dotdash",
-    colour = "#a65628",
     linewidth = 1
   ) +
   labs(
@@ -375,8 +380,7 @@ left_join(
   by = join_by(gauge)
   ) 
 
-summary_partitioning |> 
-  filter(is.na(values))
+
 
 ## 4.5 Determine partitioning control and multiplier statistics ================
 ### Progressively step up percentiles until we see a change:
@@ -444,6 +448,20 @@ partitioning_temperate_parameters <- pmap(
   )
 
 
+
+## Add selected multiplier for dashed-line plot (based on 03 file)
+selected_change <- partitioning_temperate_parameters |> pull(small_change)
+
+# Little change for autocorrelation and skewness with small_change
+# Use 99th percentile
+selected_change[3:5] <- partitioning_temperate_parameters$large_change[3:5]
+
+partitioning_temperate_parameters <- partitioning_temperate_parameters |> 
+  add_column(
+    selected_change = selected_change
+  )
+
+
 write_csv(
   partitioning_temperate_parameters,
   "./Results/partitioning_temperate_parameters.csv"
@@ -507,6 +525,7 @@ plot_summary_partitioning_stat <- summary_partitioning |>
 
 ## 4.6 Boxplot of rainfall-partitioning statistics =============================
 partitioning_boxplot <- plot_summary_partitioning_stat |> 
+  filter(major_climate_type != "Overall") |> 
   ggplot(aes(x = major_climate_type, y = values, fill = major_climate_type)) +
   geom_boxplot(
     show.legend = FALSE,
@@ -514,19 +533,19 @@ partitioning_boxplot <- plot_summary_partitioning_stat |>
     staplewidth = 0.25
     ) +
   geom_hline(
-    aes(yintercept = small_change), 
+    aes(yintercept = selected_change), 
     data = partitioning_temperate_parameters,
-    linetype = "dashed",
+    linetype = "longdash",
     colour = "#ff7f00",
     linewidth = 1
   ) +
-  geom_hline(
-    aes(yintercept = large_change), 
-    data = partitioning_temperate_parameters,
-    linetype = "dotdash",
-    colour = "#a65628",
-    linewidth = 1
-  ) +
+  #geom_hline(
+  #  aes(yintercept = large_change), 
+  #  data = partitioning_temperate_parameters,
+  #  linetype = "dotdash",
+  #  colour = "#a65628",
+  #  linewidth = 1
+  #) +
   labs(
     x = "Major Climate Type",
     y = "Value"
