@@ -270,6 +270,22 @@ names(multiplier_labs) <- streamflow_parameter_multipliers
 
 ## Combined ks and fligner
 combined_residual_detection_plot <- summary_all_tests |>
+  mutate(
+    parameter = case_when(
+      parameter == "a0" ~ "Intercept",
+      parameter == "a1" ~ "Slope",
+      parameter == "a2" ~ "Autocorrelation",
+      parameter == "a3" ~ "Standard Deviation",
+      parameter == "a4" ~ "Skewness",
+      .default = parameter
+    )
+  ) |> 
+  mutate(
+    parameter = factor(
+      parameter, 
+      levels = c("Intercept", "Slope", "Autocorrelation", "Standard Deviation", "Skewness")
+      )
+  ) |> 
   ggplot(aes(x = years_post_change, y = ave_p_value, colour = ks_or_flig)) +
   geom_line() +
   geom_ribbon(
