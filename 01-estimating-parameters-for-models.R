@@ -210,17 +210,37 @@ rainfall_boxplot <- plot_summary_rainfall_stat |>
     data = rainfall_temperate_parameters,
     linetype = "longdash",
     colour = "#ff7f00",
-    linewidth = 1
+    linewidth = 1,
+    show.legend = FALSE
   ) +
   labs(
     x = "Major Climate Type",
-    y = "Value"
+    y = "Value",
+    fill = NULL
   ) +
   scale_fill_brewer(palette = "Set1") +
   facet_wrap(~metric, scales = "free_y") +
   theme_bw() +
-  theme()
+  theme(
+    axis.title = element_text(size = 16),
+    strip.text = element_text(size = 14),
+    axis.text = element_text(size = 13),
+    legend.position = "bottom",
+  ) 
+  #guides(
+  #  fill = guide_legend(
+  #    override.aes = list(
+  #      linetype = c(5, 0, 0),
+  #      x = c("1", "2", "3")
+  #    )
+  #  ),
+  #  median = guide_legend(
+  #    override.aes = list(colour = "blue")
+  #  )
+  #) 
+    
 
+rainfall_boxplot
 
 ### Save graph #################################################################
 ggsave(
@@ -539,13 +559,6 @@ partitioning_boxplot <- plot_summary_partitioning_stat |>
     colour = "#ff7f00",
     linewidth = 1
   ) +
-  #geom_hline(
-  #  aes(yintercept = large_change), 
-  #  data = partitioning_temperate_parameters,
-  #  linetype = "dotdash",
-  #  colour = "#a65628",
-  #  linewidth = 1
-  #) +
   labs(
     x = "Major Climate Type",
     y = "Value"
@@ -553,7 +566,12 @@ partitioning_boxplot <- plot_summary_partitioning_stat |>
   scale_fill_brewer(palette = "Set1") +
   facet_wrap(~metric, scales = "free_y") +
   theme_bw() +
-  theme()
+  theme(
+    axis.title = element_text(size = 16),
+    strip.text = element_text(size = 14),
+    axis.text = element_text(size = 13),
+    legend.position = "bottom",
+  ) 
 
 
 ### Save plot ##################################################################
