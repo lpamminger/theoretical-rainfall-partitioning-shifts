@@ -269,7 +269,7 @@ names(multiplier_labs) <- streamflow_parameter_multipliers
 
 
 ## Combined ks and fligner
-combined_residual_detection_plot <- summary_all_tests |>
+combined_residual_detection_results <- summary_all_tests |>
   mutate(
     parameter = case_when(
       parameter == "a0" ~ "Intercept",
@@ -285,7 +285,9 @@ combined_residual_detection_plot <- summary_all_tests |>
       parameter, 
       levels = c("Intercept", "Slope", "Autocorrelation", "Standard Deviation", "Skewness")
       )
-  ) |> 
+  ) 
+
+combined_residual_detection_plot <- combined_residual_detection_results|> 
   ggplot(aes(x = years_post_change, y = ave_p_value, colour = ks_or_flig)) +
   geom_line() +
   geom_ribbon(
@@ -316,8 +318,31 @@ combined_residual_detection_plot <- summary_all_tests |>
   ) +
   theme(legend.position = "bottom")
 
+
+# Get the unqiue parameter and multiple combinations by facets
+abc_labels <- expand_grid(
+  parameter = combined_residual_detection_results |> pull(parameter) |> unique(),
+  multiplier = combined_residual_detection_results |> pull(multiplier) |> unique()
+) |> 
+  # Add label name
+  add_column(
+    label = paste0(letters[1:15], ")")
+  ) |> 
+  # Add x and y position (x and y are constant between facets. Use fixed value)
+  add_column(
+    years_post_change = 12, # use same name as combined_residual_detection_plot
+    ave_p_value = 0.9 # use same name as combined_residual_detection_plot
+  ) |> 
+  geom_text(
+    mapping = aes(x = years_post_change, y = ave_p_value, label = label),
+    inherit.aes = FALSE
+  ) 
+  
+labelled_combined_residual_detection_plot <- combined_residual_detection_plot + abc_labels 
+
+
 ggsave(paste0("./Graphs/combined_streamflow_detection_", get_date(), ".pdf"),
-  plot = combined_residual_detection_plot,
+  plot = labelled_combined_residual_detection_plot,
   device = cairo_pdf,
   units = "mm",
   width = 190,
