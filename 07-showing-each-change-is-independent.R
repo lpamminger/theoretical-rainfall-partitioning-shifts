@@ -233,7 +233,7 @@ t_test_results <- summarise_intercept_slope |>
 
 
 # set constant binwidth for everything
-hist_plot <- pivot_for_plotting |>
+hist_results <- pivot_for_plotting |>
   mutate(
     intercept_or_slope = if_else(intercept_or_slope == "slope", "Fitted Slope", "Fitted Intercept"),
     parameter_changed = case_when(
@@ -253,7 +253,10 @@ hist_plot <- pivot_for_plotting |>
       "Standard Deviation",
       "Skewness"
     )
-  )) |>
+  )
+  ) 
+
+hist_plot <- hist_results |>
   ggplot(aes(x = intercept_or_slope_value)) +
   geom_histogram(
     fill = "grey",
@@ -278,6 +281,49 @@ hist_plot <- pivot_for_plotting |>
     panel.grid.minor = element_blank(),
     axis.title = element_text(size = 12)
   )
+
+values_for_hist_plot <- ggplot_build(hist_plot)
+calc_abc_labels <- values_for_hist_plot$data[[1]] |> 
+  select(y, x) |> 
+  add_column(
+    parameter_changed = rep(c("Intercept", "Slope", "Autocorrelation", "Standard Deviation", "Skewness"), each = 100)
+  ) |> 
+  add_column(
+    intercept_or_slope = rep(rep(c("Fitted Intercept", "Fitted Slope"), each = 50), times = 5)
+  ) |> 
+  mutate(
+    parameter_changed = factor(parameter_changed, levels = c("Intercept", "Slope", "Autocorrelation", "Standard Deviation", "Skewness"))
+  )
+
+x_abc_labels <- calc_abc_labels |> 
+  summarise(
+    xmin = min(x),
+    .by = c(parameter_changed, intercept_or_slope)
+  ) 
+
+y_abc_labels <- calc_abc_labels |> 
+  summarise(
+    ymax = max(y),
+    .by = parameter_changed
+  ) |> 
+  mutate(
+    ymax = ymax * 0.95
+  )
+ 
+abc_labels <- x_abc_labels |> 
+  left_join(
+    y_abc_labels,
+    by = join_by(parameter_changed)
+  ) |> 
+  add_column(
+    label = paste0(letters[1:10],")")
+  ) |> 
+geom_text(
+  mapping = aes(x = xmin, y = ymax, label = label),
+  inherit.aes = FALSE
+) 
+
+hist_plot <- hist_plot + abc_labels
 
 ggsave(
   plot = hist_plot,
