@@ -6,10 +6,6 @@ rm(list = ls())
 cat("\014")
 
 
-# TODO: 
-# - add orange line to legend in boxplots
-# - make text larger in figure (facet, x and y labels, axis labels)
-
 # Import libraries -------------------------------------------------------------
 library(tidyverse)
 library(sn)
@@ -215,32 +211,59 @@ rainfall_boxplot <- plot_summary_rainfall_stat |>
   ) +
   labs(
     x = "Major Climate Type",
-    y = "Value",
+    y = "Parameter Value",
     fill = NULL
   ) +
   scale_fill_brewer(palette = "Set1") +
   facet_wrap(~metric, scales = "free_y") +
   theme_bw() +
   theme(
-    axis.title = element_text(size = 16),
-    strip.text = element_text(size = 14),
-    axis.text = element_text(size = 13),
+    axis.title = element_text(size = 18),
+    strip.text = element_blank(), #Remove facet labels element_text(size = 14),
+    axis.text = element_text(size = 16),
     legend.position = "bottom",
   ) 
-  #guides(
-  #  fill = guide_legend(
-  #    override.aes = list(
-  #      linetype = c(5, 0, 0),
-  #      x = c("1", "2", "3")
-  #    )
-  #  ),
-  #  median = guide_legend(
-  #    override.aes = list(colour = "blue")
-  #  )
-  #) 
-    
 
-rainfall_boxplot
+
+# Use the values in the rainfall_boxplot to determine location of abc labels
+## There is a whole thing about how geom_boxplot calculates the histograms
+# https://ggplot2.tidyverse.org/reference/geom_boxplot.html#computed-variables
+## Use ggplot_build to direct extract values
+
+values_for_rainfall_boxplot <- ggplot_build(rainfall_boxplot)
+upper_whisters <- values_for_rainfall_boxplot$data[[1]]$ymax
+
+abc_rainfall_labels <- tibble(
+  metric = rep(c("Mean", "Standard Deviation", "Autocorrelation", "Skewness"), each = 3),
+  values = upper_whisters
+) |> 
+  summarise(
+    values = max(values),
+    .by = metric
+  ) |> 
+  add_column(
+    major_climate_type = "Tropical (A)"
+  ) |> 
+  add_column(
+    label = c("a)", "b)", "c)", "d)")
+  ) |> 
+  # order metric
+  mutate(
+    metric = factor(
+      metric, 
+      levels = c("Mean", "Standard Deviation", "Autocorrelation", "Skewness")
+      )
+    ) |> 
+  geom_text(
+    mapping = aes(x = major_climate_type, y = values, label = label),
+    inherit.aes = FALSE,
+    nudge_x = -0.5,
+    size = 7
+  ) 
+
+
+
+rainfall_boxplot <- rainfall_boxplot + abc_rainfall_labels
 
 ### Save graph #################################################################
 ggsave(
@@ -561,17 +584,58 @@ partitioning_boxplot <- plot_summary_partitioning_stat |>
   ) +
   labs(
     x = "Major Climate Type",
-    y = "Value"
+    y = "Parameter Value"
   ) +
   scale_fill_brewer(palette = "Set1") +
   facet_wrap(~metric, scales = "free_y") +
   theme_bw() +
   theme(
-    axis.title = element_text(size = 16),
-    strip.text = element_text(size = 14),
-    axis.text = element_text(size = 13),
+    axis.title = element_text(size = 18),
+    strip.text = element_blank(), #element_text(size = 14),
+    axis.text.x = element_text(size = 14),
+    axis.text.y = element_text(size = 16),
     legend.position = "bottom",
   ) 
+
+
+# Repeat method used for the rainfall boxplot labels
+values_for_partitioning_boxplot <- ggplot_build(partitioning_boxplot)
+upper_whisters_partitioning <- values_for_partitioning_boxplot$data[[1]]$ymax
+
+abc_partitioning_labels <- tibble(
+  metric = rep(c("Intercept", "Slope", "Autocorrelation", "Standard Deviation", "Skewness"), each = 3),
+  values = upper_whisters_partitioning
+) |> 
+  summarise(
+    values = max(values),
+    .by = metric
+  ) |> 
+  mutate(
+    values = values * 1.055 # add 5.5 % to stop overlapping with dotted lines
+  ) |> 
+  add_column(
+    major_climate_type = "Tropical (A)"
+  ) |> 
+  add_column(
+    label = c("a)", "b)", "c)", "d)", "e)")
+  ) |> 
+  # order metric
+  mutate(
+    metric = factor(
+      metric, 
+      levels = c("Intercept", "Slope", "Autocorrelation", "Standard Deviation", "Skewness")
+    )
+  ) |> 
+  geom_text(
+    mapping = aes(x = major_climate_type, y = values, label = label),
+    inherit.aes = FALSE,
+    nudge_x = -0.4,
+    size = 7
+  ) 
+
+
+
+partitioning_boxplot <- partitioning_boxplot + abc_partitioning_labels
 
 
 ### Save plot ##################################################################
