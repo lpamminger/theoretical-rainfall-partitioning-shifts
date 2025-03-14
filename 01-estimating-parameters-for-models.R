@@ -423,6 +423,13 @@ left_join(
   by = join_by(gauge)
   ) 
 
+# Some catchments have a abs(skewness) >= 1  
+#x <- summary_partitioning |> 
+#  filter(metric == "Skewness") |> 
+#  mutate(
+#    abs_skewness = abs(values)
+#  ) |> 
+#  filter(abs_skewness >= 1)
 
 
 ## 4.5 Determine partitioning control and multiplier statistics ================
