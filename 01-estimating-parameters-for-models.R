@@ -200,7 +200,8 @@ rainfall_boxplot <- plot_summary_rainfall_stat |>
     show.legend = FALSE,
     outliers = FALSE,
     staplewidth = 0.25,
-    alpha = 0.9
+    alpha = 0.9,
+    linewidth = 0.3
     ) +
   geom_hline(
     aes(yintercept = selected_change), 
@@ -582,7 +583,8 @@ partitioning_boxplot <- plot_summary_partitioning_stat |>
     show.legend = FALSE,
     outliers = FALSE,
     staplewidth = 0.25,
-    alpha = 0.9
+    alpha = 0.9,
+    linewidth = 0.3
     ) +
   geom_hline(
     aes(yintercept = selected_change), 
