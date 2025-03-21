@@ -315,7 +315,7 @@ ggsave(
   plot = plot,
   device = "pdf",
   path = "./Graphs",
-  width = 145,
-  height = 120,
+  width = 140,
+  height = 90,
   units = "mm"
 )
