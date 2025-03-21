@@ -316,7 +316,12 @@ combined_residual_detection_plot <- combined_residual_detection_results|>
       multiplier = multiplier_labs
     )
   ) +
-  theme(legend.position = "bottom")
+  theme(
+    legend.position = "bottom",
+    axis.title = element_text(size = 10),
+    legend.title = element_text(size = 10),
+    strip.text = element_text(size = 8)
+    )
 
 
 # Get the unqiue parameter and multiple combinations by facets
@@ -335,7 +340,8 @@ abc_labels <- expand_grid(
   ) |> 
   geom_text(
     mapping = aes(x = years_post_change, y = ave_p_value, label = label),
-    inherit.aes = FALSE
+    inherit.aes = FALSE,
+    size = 3
   ) 
   
 labelled_combined_residual_detection_plot <- combined_residual_detection_plot + abc_labels 
@@ -345,6 +351,6 @@ ggsave(paste0("./Graphs/combined_streamflow_detection_", get_date(), ".pdf"),
   plot = labelled_combined_residual_detection_plot,
   device = cairo_pdf,
   units = "mm",
-  width = 190,
-  height = 230
+  width = 145,
+  height = 170
 )

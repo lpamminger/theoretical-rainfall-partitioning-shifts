@@ -199,14 +199,15 @@ rainfall_boxplot <- plot_summary_rainfall_stat |>
   geom_boxplot(
     show.legend = FALSE,
     outliers = FALSE,
-    staplewidth = 0.25
+    staplewidth = 0.25,
+    alpha = 0.9
     ) +
   geom_hline(
     aes(yintercept = selected_change), 
     data = rainfall_temperate_parameters,
     linetype = "longdash",
     colour = "#ff7f00",
-    linewidth = 1,
+    linewidth = 0.5,
     show.legend = FALSE
   ) +
   labs(
@@ -218,9 +219,9 @@ rainfall_boxplot <- plot_summary_rainfall_stat |>
   facet_wrap(~metric, scales = "free_y") +
   theme_bw() +
   theme(
-    axis.title = element_text(size = 18),
+    axis.title = element_text(size = 8),
     strip.text = element_blank(), #Remove facet labels element_text(size = 14),
-    axis.text = element_text(size = 16),
+    axis.text = element_text(size = 6),
     legend.position = "bottom",
   ) 
 
@@ -258,7 +259,7 @@ abc_rainfall_labels <- tibble(
     mapping = aes(x = major_climate_type, y = values, label = label),
     inherit.aes = FALSE,
     nudge_x = -0.5,
-    size = 7
+    size = 3
   ) 
 
 
@@ -271,8 +272,8 @@ ggsave(
   plot = rainfall_boxplot,
   device = "pdf",
   path = "./Graphs",
-  width = 297,
-  height = 210,
+  width = 145,
+  height = 100,
   units = "mm"
 )
 
@@ -580,14 +581,15 @@ partitioning_boxplot <- plot_summary_partitioning_stat |>
   geom_boxplot(
     show.legend = FALSE,
     outliers = FALSE,
-    staplewidth = 0.25
+    staplewidth = 0.25,
+    alpha = 0.9
     ) +
   geom_hline(
     aes(yintercept = selected_change), 
     data = partitioning_temperate_parameters,
-    linetype = "longdash",
+    linetype = "dashed",
     colour = "#ff7f00",
-    linewidth = 1
+    linewidth = 0.5
   ) +
   labs(
     x = "Major Climate Type",
@@ -597,10 +599,10 @@ partitioning_boxplot <- plot_summary_partitioning_stat |>
   facet_wrap(~metric, scales = "free_y") +
   theme_bw() +
   theme(
-    axis.title = element_text(size = 18),
+    axis.title = element_text(size = 8),
     strip.text = element_blank(), #element_text(size = 14),
-    axis.text.x = element_text(size = 14),
-    axis.text.y = element_text(size = 16),
+    axis.text.x = element_text(size = 6),
+    axis.text.y = element_text(size = 6),
     legend.position = "bottom",
   ) 
 
@@ -637,7 +639,7 @@ abc_partitioning_labels <- tibble(
     mapping = aes(x = major_climate_type, y = values, label = label),
     inherit.aes = FALSE,
     nudge_x = -0.4,
-    size = 7
+    size = 3
   ) 
 
 
@@ -651,8 +653,8 @@ ggsave(
   plot = partitioning_boxplot,
   device = "pdf",
   path = "./Graphs",
-  width = 297,
-  height = 210,
+  width = 145, 
+  height = 100,#210,
   units = "mm"
 )
 

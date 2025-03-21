@@ -275,9 +275,11 @@ hist_plot <- hist_results |>
     scales = "free"
   ) +
   theme(
-    strip.text = element_text(size = 10),
+    strip.text.x = element_text(size = 9),
+    strip.text.y = element_text(size = 8),
     panel.grid.minor = element_blank(),
-    axis.title = element_text(size = 12)
+    axis.title = element_text(size = 10),
+    axis.text = element_text(size = 9)
   )
 
 # Make abc labels
@@ -329,7 +331,7 @@ ggsave(
   plot = hist_plot,
   filename = paste0("./Graphs/rainfall_only_intercept_slope_assessment_replicate_histogram_", REPLICATES, "_", "year_", nrow(summarise_intercept_slope) / 4, "_", get_date(), ".pdf"),
   device = "pdf",
-  width = 210,
-  height = 160,
+  width = 145,
+  height = 130,
   units = "mm"
 )

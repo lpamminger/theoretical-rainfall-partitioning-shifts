@@ -272,13 +272,13 @@ tidy_boxcox_streamflow <- tidy_boxcox_streamflow |>
 
 main_plot <- tidy_boxcox_streamflow |>
   ggplot(aes(x = rainfall, y = boxcox_streamflow, colour = control_or_change, fill = control_or_change, shape = control_or_change)) +
-  geom_point(alpha = 0.7) +
-  geom_smooth(formula = y ~ x, method = lm, se = FALSE, linewidth = 0.25) +
+  geom_point(alpha = 0.7, size = 1.1, stroke = 0.3) +
+  geom_smooth(formula = y ~ x, method = lm, se = FALSE, linewidth = 0.15) +
   labs(
     x = "Total Annual Precipitation (mm)",
     y = "Total Annual Streamflow (Box-Cox Transformed)"
   ) +
-  scale_color_brewer(palette = "Set1") +
+  scale_colour_brewer(palette = "Set1") +
   scale_fill_manual(values = c("#f5a6a7", "#d4e5f2")) +
   theme_bw() +
   facet_wrap(
@@ -297,10 +297,11 @@ main_plot <- tidy_boxcox_streamflow |>
     legend.position.inside = c(0.75, 0.15),
     legend.background = element_rect(fill = NULL, colour = "black", linewidth = 0.2),
     legend.key.size = unit(1, "cm"),
-    legend.text = element_text(size = 16),
-    axis.title = element_text(size = 14)
+    legend.text = element_text(size = 11),
+    axis.title = element_text(size = 10),
+    axis.text = element_text(size = 8)
   ) +
-  guides(colour = guide_legend(override.aes = list(size = 5, linewidth = 0.5)))
+  guides(colour = guide_legend(override.aes = list(size = 3, linewidth = 0.5)))
 
 
 
@@ -359,9 +360,9 @@ histogram_generator <- function(parameter_specific_data) {
       y = "Frequencey"
     ) +
     theme(
-      axis.title = element_text(size = 9),
+      axis.title = element_text(size = 6.5),
       plot.background = element_blank(),
-      axis.text = element_text(size = 7),
+      axis.text = element_text(size = 5),
       panel.grid.minor = element_blank()
     )
 }
@@ -408,7 +409,7 @@ abc_labels <- data.frame(label = paste0(letters[1:length(control_parameters)], "
       label = label
     ),
     inherit.aes = FALSE,
-    size = 6
+    size = 4
   ) # , fontface = "bold"
 
 
@@ -427,8 +428,8 @@ lag_1_streamflow_graph <- tidy_boxcox_streamflow |>
   ) |>
   tail(-2) |> # remove first two values of tibble because of lag
   ggplot(aes(x = boxcox_streamflow, y = lag_boxcox_streamflow, colour = control_or_change, fill = control_or_change, shape = control_or_change)) +
-  geom_point(alpha = 0.7) +
-  geom_smooth(formula = y ~ x, method = lm, se = FALSE, linewidth = 0.25) +
+  geom_point(alpha = 0.7, size = 1.5, stroke = 0.3) +
+  geom_smooth(formula = y ~ x, method = lm, se = FALSE, linewidth = 0.15) +
   labs(
     x = "Total Annual Streamflow (Box-Cox Transformed)",
     y = "Lag-1 Total Annual Streamflow (Box-Cox Transformed)"
@@ -440,12 +441,13 @@ lag_1_streamflow_graph <- tidy_boxcox_streamflow |>
   theme(
     legend.title = element_blank(),
     legend.position = "inside",
-    legend.position.inside = c(0.15, 0.89),
+    legend.position.inside = c(0.17, 0.87),
     legend.background = element_rect(fill = NULL, colour = "black", linewidth = 0.2),
-    legend.text = element_text(size = 10),
-    axis.title = element_text(size = 10)
+    legend.text = element_text(size = 7),
+    axis.title = element_text(size = 8),
+    axis.text = element_text(size = 6)
   ) +
-  guides(colour = guide_legend(override.aes = list(size = 2, linewidth = 0.5)))
+  guides(colour = guide_legend(override.aes = list(size = 2, linewidth = 0.25)))
 
 
 
@@ -459,10 +461,9 @@ ggsave(paste0("./Graphs/streamflow_sensitivity_bc_rainfall_runoff_a4_page_", get
   plot = rainfall_runoff_plot,
   device = cairo_pdf,
   units = "mm",
-  width = 210,
-  height = 297
+  width = 145,
+  height = 198 #185
 )
-
 
 
 
@@ -470,7 +471,8 @@ ggsave(paste0("./Graphs/streamflow_sensitivity_bc_rainfall_runoff_a4_page_", get
 ggsave(paste0("./Graphs/lag_1_streamflow_graph_", get_date(), ".pdf"),
   plot = lag_1_streamflow_graph,
   device = "pdf",
-  width = 100,
-  height = 100,
+  width = 80,
+  height = 80,
   units = "mm"
 )
+
