@@ -337,9 +337,9 @@ combined_low_high_sd_plot <- summary_all_tests |>
 
 single_low_high_sd_plot <- summary_all_tests |>
   filter(multiplier == 1.5) |>
-  filter(ks_or_flig == "Kolmogorov-Smirnov") |>
+  filter(ks_or_flig == "Fligner-Killeen") |> 
   ggplot(aes(x = years_post_change, y = ave_p_value, colour = low_or_high_sd)) +
-  geom_line() +
+  geom_line(linewidth = 0.8) +
   geom_ribbon(
     aes(
       x = years_post_change,
@@ -350,7 +350,7 @@ single_low_high_sd_plot <- summary_all_tests |>
     ),
     alpha = 0.15
   ) +
-  geom_hline(yintercept = 0.05, colour = "black", linetype = "dashed") +
+  geom_hline(yintercept = 0.05, colour = "black", linetype = "dashed", linewidth = 0.8) +
   labs(
     x = "Years of Post Change Data",
     y = "P-value",
@@ -360,11 +360,17 @@ single_low_high_sd_plot <- summary_all_tests |>
   scale_color_brewer(palette = "Set1") +
   scale_fill_brewer(palette = "Set1") +
   theme_bw() +
-  theme(legend.position = "bottom")
+  theme(
+    legend.position = "bottom",
+    axis.text = element_text(size = 8),
+    axis.title = element_text(size = 10),
+    legend.text = element_text(size = 8),
+    legend.title = element_text(size = 8)
+    )
 
 
 # Save graphs ------------------------------------------------------------------
-
+combined_low_high_sd_plot
 ggsave(paste0("./Graphs/how_low_high_sd_impacts_auto_detection", get_date(), ".pdf"),
   plot = combined_low_high_sd_plot,
   device = cairo_pdf,
@@ -373,11 +379,11 @@ ggsave(paste0("./Graphs/how_low_high_sd_impacts_auto_detection", get_date(), ".p
   height = 110
 )
 
-
+single_low_high_sd_plot
 ggsave(paste0("./Graphs/single_how_low_high_sd_impacts_auto_detection", get_date(), ".pdf"),
   plot = single_low_high_sd_plot,
   device = cairo_pdf,
   units = "mm",
-  width = 210,
-  height = 160
+  width = 100,
+  height = 80
 )

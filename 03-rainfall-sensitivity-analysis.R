@@ -51,6 +51,7 @@ multipliers_for_control_parameters <- rainfall_temperate_parameters |> pull(smal
 # Use 99th percentile
 multipliers_for_control_parameters[3:4] <- rainfall_temperate_parameters$large_multiplier[3:4]
 
+#multipliers_for_control_parameters[2] <- 1.4 # for streamflow_comparison plot
 
 change_parameters <- imap(
   .x = multipliers_for_control_parameters,
@@ -229,7 +230,7 @@ tidy_boxcox_streamflow <- tidy_boxcox_streamflow |>
 ## Main plot - rainfall-runoff histograms ======================================
 main_plot <- tidy_boxcox_streamflow |>
   ggplot(aes(x = rainfall, y = boxcox_streamflow, colour = control_or_change, fill = control_or_change, shape = control_or_change)) +
-  geom_point(alpha = 0.7) +
+  geom_point(alpha = 0.7, size = 1.3, stroke = 0.3) +
   geom_smooth(formula = y ~ x, method = lm, se = FALSE, linewidth = 0.25) +
   labs(
     x = "Total Annual Precipitation (mm)",
@@ -247,10 +248,11 @@ main_plot <- tidy_boxcox_streamflow |>
     legend.title = element_blank(),
     strip.text = element_blank(),
     legend.position = "inside",
-    legend.position.inside = c(0.08, 0.95),
+    legend.position.inside = c(0.11, 0.93),
     legend.background = element_rect(fill = NULL, colour = "black", linewidth = 0.2),
-    axis.title = element_text(size = 13),
-    legend.text = element_text(size = 13)
+    axis.title = element_text(size = 10),
+    legend.text = element_text(size = 10),
+    axis.text = element_text(size = 9)
   ) +
   guides(colour = guide_legend(override.aes = list(size = 3, linewidth = 0.5)))
 
@@ -267,8 +269,8 @@ abc_labels <- data.frame(
       label = label
     ),
     inherit.aes = FALSE,
-    size = 6
-  ) # , fontface = "bold"
+    size = 4
+  ) 
 
 
 
@@ -280,8 +282,8 @@ ggsave(paste0("./Graphs/rainfall_sensitivity_bc_rainfall_runoff_a4_page_", get_d
   plot = rainfall_runoff_plot,
   device = "pdf",
   units = "mm",
-  width = 210,
-  height = 210
+  width = 145,
+  height = 145
 )
 
 
@@ -290,18 +292,18 @@ ggsave(paste0("./Graphs/rainfall_sensitivity_bc_rainfall_runoff_a4_page_", get_d
 rainfall_runoff_streamflow_changes <- read_csv("./Results/rainfall_runoff_streamflow_changes.csv", show_col_types = FALSE)
 
 # I am only interested in comparing the mean - intercept and sd and sd
-tidy_rainfall_runoff_rainfall_changes <- tidy_boxcox_streamflow |>
+tidy_rainfall_changes <- tidy_boxcox_streamflow |>
   filter(parameter %in% c("mean", "standard_deviation")) |>
-  add_column(model = "Synthetic Streamflow Model", .before = 1)
+  add_column(model = "Stochastic Rainfall Model", .before = 1)
 
 
-tidy_rainfall_runoff_streamflow_changes <- rainfall_runoff_streamflow_changes |>
+tidy_paritioning_changes <- rainfall_runoff_streamflow_changes |>
   filter(parameter %in% c("intercept", "standard_deviation")) |>
-  add_column(model = "Stochastic Rainfall Model", .before = 1) |>
-  select(colnames(tidy_rainfall_runoff_rainfall_changes))
+  add_column(model = "Synthetic Streamflow Model", .before = 1) |> 
+  select(colnames(tidy_rainfall_changes)) # for rbinding
 
 
-streamflow_comparison <- rbind(tidy_rainfall_runoff_streamflow_changes, tidy_rainfall_runoff_rainfall_changes) |>
+streamflow_comparison <- rbind(tidy_rainfall_changes, tidy_paritioning_changes) |>
   mutate(
     change_type = if_else(parameter == "standard_deviation", "Change in Peaks and Troughs", "Change in Vertical Axis"),
     parameter = if_else((parameter == "standard_deviation") & (model == "Stochastic Rainfall Model"), "standard_deviation_r", parameter)
@@ -322,7 +324,7 @@ streamflow_comparison_plot <- streamflow_comparison |>
   ggplot(aes(x = time, y = streamflow, colour = control_or_change)) +
   geom_line() +
   labs(
-    x = "Year(s) of Data",
+    x = "Years of Data",
     y = "Total Annual Streamflow (mm)"
   ) +
   theme_bw() +
@@ -331,9 +333,12 @@ streamflow_comparison_plot <- streamflow_comparison |>
   theme(
     legend.title = element_blank(),
     legend.position = "bottom",
-    legend.text = element_text(size = 13),
-    axis.title = element_text(size = 13),
-    strip.text = element_text(size = 10)
+    legend.text = element_text(size = 8),
+    axis.title = element_text(size = 8),
+    strip.text.y = element_text(size = 7),
+    strip.text.x = element_text(size = 8),
+    axis.text = element_text(size = 7),
+    legend.background = element_rect(fill = "white", colour = "black", linewidth = 0.2)
   )
 
 
@@ -353,7 +358,7 @@ abc_labels_streamflow <- data.frame(
       label = label
     ),
     inherit.aes = FALSE,
-    size = 6
+    size = 3
   )
 
 
@@ -362,7 +367,8 @@ final_streamflow_comparison_plot <- streamflow_comparison_plot + abc_labels_stre
 ggsave(paste0("./Graphs/streamflow_comparison_", get_date(), ".pdf"),
   plot = final_streamflow_comparison_plot,
   device = "pdf",
-  width = 210,
-  height = 135,
+  width = 145,
+  height = 100,
   units = "mm"
 )
+

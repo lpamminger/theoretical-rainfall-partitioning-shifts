@@ -289,7 +289,7 @@ plot <- identification_results |>
     colour = known_change,
     linetype = as.factor(shift_length)
   )) +
-  geom_line(linewidth = 1) +
+  geom_line(linewidth = 0.8) +
   labs(
     x = "Change in Parameter (%)",
     y = "Correct Change Identified (%)",
@@ -300,9 +300,14 @@ plot <- identification_results |>
   theme_bw() +
   theme(
     legend.position = "bottom",
-    axis.title = element_text(size = 11),
-    legend.text = element_text(size = 10)
-  )
+    axis.title = element_text(size = 10),
+    legend.text = element_text(size = 7),
+    legend.title = element_text(size = 8)
+  ) +
+  guides(
+    colour = guide_legend(override.aes = list(linewidth = 0.8)),
+    linetype = guide_legend(override.aes = list(linewidth = 0.8))
+    )
 
 
 ggsave(
@@ -310,7 +315,7 @@ ggsave(
   plot = plot,
   device = "pdf",
   path = "./Graphs",
-  width = 210,
-  height = 150,
+  width = 140,
+  height = 90,
   units = "mm"
 )
